@@ -54,7 +54,8 @@ main {
     flex-direction: column;
     height: 100%;
     position: relative;
-    padding-bottom: 30px; /* Reduced space for status message */
+    padding-top: 30px; /* Add space at top for status message */
+    padding-bottom: 5px; /* Reduced bottom padding */
 }
 
 .screen-content {
@@ -163,8 +164,8 @@ main {
     justify-content: flex-start;
     align-items: center;
     text-align: center;
-    padding-top: 5px;
-    padding-bottom: 60px; /* Reduced space for email button */
+    padding-top: 10px; /* Reduced padding */
+    padding-bottom: 50px; /* Reduced space for email button */
 }
 
 .celebration-header {
@@ -224,7 +225,7 @@ main {
     gap: 8px;
     width: 100%;
     position: absolute;
-    bottom: 35px; /* Moved up to ensure visibility */
+    bottom: 30px; /* Moved up slightly */
 }
 
 .action-button.email {
@@ -249,7 +250,7 @@ main {
     align-items: center;
     justify-content: center;
     position: absolute;
-    bottom: 5px;
+    top: 45px; /* Move to top instead of bottom */
     left: 5px;
     right: 5px;
     border: 2px solid;

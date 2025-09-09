@@ -506,7 +506,6 @@ function resetApp() {
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
-    showStatus('PROCESSING RESPONSE...', 'info');
     
     if (data.data) {
         try {
@@ -538,11 +537,13 @@ window.onPluginMessage = function(data) {
                 resetApp();
             }, 2000);
         } 
-        // Handle case where LLM requests image URL (fallback) - make this more specific
-        else if (data.message.includes('Please provide an image URL') || 
-                 data.message.includes('need an image URL') ||
-                 data.message.includes('upload the image')) {
-            showStatus('LLM REQUESTS IMAGE URL - UPLOADING...', 'info');
+        // Handle case where LLM requests image URL (fallback) - make this more comprehensive
+        else if (data.message.includes('image') && 
+                (data.message.includes('url') || 
+                 data.message.includes('link') || 
+                 data.message.includes('file') ||
+                 data.message.includes('upload'))) {
+            showStatus('LLM NEEDS IMAGE URL - UPLOADING...', 'info');
             console.log('LLM requested image URL, using catbox fallback');
             // Use catbox as fallback only when LLM explicitly requests it
             fallbackToCatboxAnalysis();
@@ -660,9 +661,9 @@ function sendImageToLLM() {
         // Log the image data info for debugging
         console.log('Sending image to LLM. Image data length:', capturedImageData ? capturedImageData.length : 'null');
         
-        // Send image data directly to LLM for analysis
+        // Send image data directly to LLM for analysis with more specific instructions
         const payload = {
-            message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}.`,
+            message: `I'm sending you an image captured from the R1 device's camera. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Do not request an image URL as I'm sending the image data directly.`,
             useLLM: true,
             wantsR1Response: false,  // Set to false to get JSON response
             imageData: capturedImageData  // Send image data directly
@@ -706,9 +707,9 @@ async function fallbackToCatboxAnalysis() {
                 throw new Error('Invalid image URL received');
             }
             
-            // Send image URL to LLM for analysis
+            // Send image URL to LLM for analysis with clearer instructions
             const payload = {
-                message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Image URL: ${imageUrl}`,
+                message: `I've uploaded the image to ${imageUrl}. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}.`,
                 useLLM: true,
                 wantsR1Response: false  // Set to false to get JSON response
             };
