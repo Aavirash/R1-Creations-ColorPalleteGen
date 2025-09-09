@@ -1,7 +1,8 @@
-// Mood Palette Generator - Single Screen Workflow
+// Mood Palette Generator - Single Screen Workflow with R1 PTT Support
 let capturedImageData = null;
 let currentPalette = [];
 let videoStream = null;
+let videoElement = null;
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -12,7 +13,14 @@ function initializeApp() {
     // Show initial screen
     showScreen1();
     
-    showStatus('READY TO CAPTURE IMAGE', 'info');
+    showStatus('PRESS CAPTURE TO START CAMERA', 'info');
+    
+    // Register R1 PTT button listener
+    window.addEventListener('sideClick', function() {
+        if (videoElement) {
+            captureImageFromPTT();
+        }
+    });
 }
 
 function showScreen1() {
@@ -21,12 +29,12 @@ function showScreen1() {
         <div class="screen-content">
             <div class="preview-section">
                 <div id="previewContainer" class="preview-container">
-                    <div class="placeholder-text">CAMERA PREVIEW</div>
+                    <div class="placeholder-text">CAMERA OFF</div>
                 </div>
             </div>
             
             <div class="controls-section">
-                <button id="captureBtn" class="action-button">CAPTURE IMAGE</button>
+                <button id="captureBtn" class="action-button">START CAMERA</button>
             </div>
         </div>
     `;
@@ -43,7 +51,7 @@ function showScreen2() {
                 <div id="thumbnailContainer" class="thumbnail-container">
                     <div class="placeholder-text">IMG</div>
                 </div>
-                <div class="preview-container" style="height: 165px;">
+                <div id="previewContainer" class="preview-container" style="height: 165px;">
                     <div class="placeholder-text">IMAGE CAPTURED</div>
                 </div>
             </div>
@@ -113,23 +121,18 @@ function startCamera() {
                 videoStream = stream;
                 
                 // Create video element
-                const video = document.createElement('video');
-                video.autoplay = true;
-                video.playsInline = true;
-                video.srcObject = stream;
-                video.style.width = '100%';
-                video.style.height = '100%';
-                video.style.objectFit = 'cover';
+                videoElement = document.createElement('video');
+                videoElement.autoplay = true;
+                videoElement.playsInline = true;
+                videoElement.srcObject = stream;
+                videoElement.style.width = '100%';
+                videoElement.style.height = '100%';
+                videoElement.style.objectFit = 'cover';
                 
                 previewContainer.innerHTML = '';
-                previewContainer.appendChild(video);
+                previewContainer.appendChild(videoElement);
                 
-                showStatus('CAMERA READY! TAP TO CAPTURE', 'info');
-                
-                // Add click to capture
-                video.addEventListener('click', function() {
-                    captureImage(video);
-                });
+                showStatus('CAMERA ON! PRESS R1 PTT TO CAPTURE', 'info');
             })
             .catch(function(error) {
                 console.error('Camera access error:', error);
@@ -142,15 +145,17 @@ function startCamera() {
     }
 }
 
-function captureImage(video) {
+function captureImageFromPTT() {
+    if (!videoElement) return;
+    
     // Create canvas to capture image
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = videoElement.videoWidth || 640;
+    canvas.height = videoElement.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     
     // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
     
     // Store the image data
     capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
@@ -159,6 +164,7 @@ function captureImage(video) {
     if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
+        videoElement = null;
     }
     
     // Show screen 2
@@ -252,9 +258,16 @@ function resetApp() {
     capturedImageData = null;
     currentPalette = [];
     
+    // Stop any existing stream
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+        videoElement = null;
+    }
+    
     // Show screen 1
     showScreen1();
-    showStatus('READY TO CAPTURE IMAGE', 'info');
+    showStatus('PRESS CAPTURE TO START CAMERA', 'info');
 }
 
 // Helper functions
