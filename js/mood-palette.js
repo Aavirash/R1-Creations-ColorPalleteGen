@@ -337,6 +337,10 @@ function displayPalette(colors) {
         colors.forEach((color, index) => {
             const swatchContainer = document.createElement('div');
             swatchContainer.className = 'swatch-container';
+            swatchContainer.style.display = 'flex';
+            swatchContainer.style.flexDirection = 'column';
+            swatchContainer.style.alignItems = 'center';
+            swatchContainer.style.margin = '5px';
             
             // Create a rectangle shape for the color
             const colorSwatch = document.createElement('div');
@@ -356,6 +360,7 @@ function displayPalette(colors) {
             colorLabel.style.fontSize = '10px';
             colorLabel.style.marginTop = '4px';
             colorLabel.style.fontFamily = 'Courier New, monospace';
+            colorLabel.style.textAlign = 'center';
             
             swatchContainer.appendChild(colorSwatch);
             swatchContainer.appendChild(colorLabel);
@@ -366,6 +371,8 @@ function displayPalette(colors) {
         
         // Update currentPalette with the received colors
         currentPalette = colors;
+        
+        console.log('Palette displayed with colors:', colors);
     } else {
         paletteDisplay.innerHTML = '<div class="placeholder-text">NO COLORS FOUND</div>';
         currentPalette = [];
@@ -373,7 +380,9 @@ function displayPalette(colors) {
 }
 
 function emailPalette() {
-    if (currentPalette.length === 0) {
+    console.log('Email palette function called, currentPalette:', currentPalette);
+    
+    if (!currentPalette || currentPalette.length === 0) {
         showStatus('NO PALETTE TO SEND', 'error');
         return;
     }
@@ -388,28 +397,16 @@ function emailPalette() {
             paletteDescription += `Color ${index + 1}: ${color}\n`;
         });
         
-        // Also generate a visual representation of the palette
-        generatePaletteImage().then(imageDataUrl => {
-            // R1 LLM should know the user's email, so we just ask it to send
-            const payload = {
-                message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
-                useLLM: true,
-                wantsR1Response: true,
-                paletteImage: imageDataUrl // Send the visual palette as well
-            };
-            
-            PluginMessageHandler.postMessage(JSON.stringify(payload));
-        }).catch(error => {
-            console.error('Error generating palette image:', error);
-            // Fallback to text-only if image generation fails
-            const payload = {
-                message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
-                useLLM: true,
-                wantsR1Response: true
-            };
-            
-            PluginMessageHandler.postMessage(JSON.stringify(payload));
-        });
+        console.log('Sending palette to LLM:', paletteDescription);
+        
+        // R1 LLM should know the user's email, so we just ask it to send
+        const payload = {
+            message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
+            useLLM: true,
+            wantsR1Response: true
+        };
+        
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
     } else {
         // Simulate email sending
         setTimeout(() => {
@@ -443,7 +440,6 @@ function resetApp() {
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
-    showStatus('RECEIVED AI RESPONSE', 'info');
     
     if (data.data) {
         try {
@@ -456,39 +452,40 @@ window.onPluginMessage = function(data) {
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
-            } else if (parsedData.message && parsedData.message.includes('image URL')) {
-                // If the LLM is asking for an image URL, try to upload to catbox
-                showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
-                fallbackToCatboxAnalysis();
             } else {
-                // If we can't parse colors, show the raw data for debugging
-                console.log('No colors found in response, showing raw data');
-                showStatus('RESPONSE: ' + data.data, 'info');
+                // If we can't parse colors, check if it's a request for image URL
+                handleLLMResponse(data.data);
             }
         } catch (e) {
             console.error('Error parsing plugin message:', e);
-            // Check if the response contains a request for an image URL
-            if (data.data.includes('image URL') || data.data.includes('image url')) {
-                showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
-                fallbackToCatboxAnalysis();
-            } else {
-                // Show the raw data if we can't parse it
-                showStatus('RESPONSE: ' + data.data, 'info');
-            }
+            // Handle non-JSON responses
+            handleLLMResponse(data.data);
         }
     } else if (data.message) {
-        // Check if the message contains a request for an image URL
-        if (data.message.includes('image URL') || data.message.includes('image url')) {
-            showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
-            fallbackToCatboxAnalysis();
-        } else {
-            showStatus(data.message, 'info');
-        }
+        handleLLMResponse(data.message);
     } else {
         // Show raw data if no message or data
         showStatus('RECEIVED: ' + JSON.stringify(data), 'info');
     }
 };
+
+// Function to handle LLM responses
+function handleLLMResponse(response) {
+    console.log('Handling LLM response:', response);
+    
+    // Check if the response is asking for an image URL
+    if (typeof response === 'string' && 
+        (response.includes('upload') || 
+         response.includes('image URL') || 
+         response.includes('direct link') ||
+         response.includes('access the image'))) {
+        showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
+        fallbackToCatboxAnalysis();
+    } else {
+        // Show the response as-is
+        showStatus(response, 'info');
+    }
+}
 
 // Helper functions
 function showStatus(message, type) {
@@ -527,19 +524,6 @@ async function fallbackToCatboxAnalysis() {
     } catch (error) {
         console.error('Fallback analysis error:', error);
         showStatus('ANALYSIS FAILED: ' + error.message, 'error');
-        
-        // Even if upload failed, let's simulate a successful analysis for testing
-        console.log('Upload failed, simulating analysis for testing');
-        showStatus('UPLOAD FAILED, SIMULATING ANALYSIS...', 'info');
-        
-        // Simulate a successful analysis response after a delay
-        setTimeout(() => {
-            // Generate some sample colors for testing
-            const sampleColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
-            currentPalette = sampleColors;
-            displayPalette(currentPalette);
-            showStatus('SIMULATED PALETTE READY! EMAIL TO SEND', 'success');
-        }, 2000);
     }
 }
 

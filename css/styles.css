@@ -164,7 +164,7 @@ main {
     align-items: center;
     text-align: center;
     padding-top: 5px;
-    padding-bottom: 60px; /* Space for email button */
+    padding-bottom: 80px; /* Increased space for email button */
 }
 
 .celebration-header {
@@ -222,7 +222,7 @@ main {
     gap: 8px;
     width: 100%;
     position: absolute;
-    bottom: 40px; /* Moved up */
+    bottom: 45px; /* Moved up to avoid overlapping with status message */
 }
 
 .action-button.email {
