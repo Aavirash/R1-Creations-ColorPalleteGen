@@ -396,7 +396,7 @@ function emailPalette() {
         const payload = {
             message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
             useLLM: true,
-            wantsR1Response: true
+            wantsR1Response: true  // Set to true to have R1 speak the response
         };
         
         PluginMessageHandler.postMessage(JSON.stringify(payload));
@@ -456,7 +456,16 @@ window.onPluginMessage = function(data) {
             showStatus(data.data, 'info');
         }
     } else if (data.message) {
-        showStatus(data.message, 'info');
+        // Handle email response
+        if (data.message.includes('sent') || data.message.includes('email')) {
+            showStatus('PALETTE SENT TO YOUR EMAIL!', 'success');
+            // Reset after success
+            setTimeout(() => {
+                resetApp();
+            }, 2000);
+        } else {
+            showStatus(data.message, 'info');
+        }
     } else {
         // Show raw data if no message or data
         showStatus('RECEIVED: ' + JSON.stringify(data), 'info');
@@ -490,7 +499,8 @@ async function fallbackToCatboxAnalysis() {
             // Send image URL to LLM for analysis
             const payload = {
                 message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Image URL: ${imageUrl}`,
-                useLLM: true
+                useLLM: true,
+                wantsR1Response: false  // Set to false to get JSON response
             };
             
             console.log('Sending to LLM:', payload.message);
