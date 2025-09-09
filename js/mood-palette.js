@@ -385,11 +385,13 @@ function displayPalette(colors) {
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-container';
         paletteContainer.style.display = 'flex';
-        paletteContainer.style.gap = '10px';
+        paletteContainer.style.gap = '8px';  // Reduced gap
         paletteContainer.style.justifyContent = 'center';
         paletteContainer.style.flexWrap = 'wrap';
         paletteContainer.style.alignItems = 'center';
-        paletteContainer.style.marginTop = '10px';
+        paletteContainer.style.marginTop = '5px';  // Reduced margin
+        paletteContainer.style.maxHeight = '100px';  // Limit height
+        paletteContainer.style.overflow = 'hidden';  // Prevent overflow
         
         colors.forEach((color, index) => {
             // Validate that color is a valid hex code
@@ -398,26 +400,29 @@ function displayPalette(colors) {
                 swatchContainer.style.display = 'flex';
                 swatchContainer.style.flexDirection = 'column';
                 swatchContainer.style.alignItems = 'center';
-                swatchContainer.style.margin = '5px';
+                swatchContainer.style.margin = '3px';  // Reduced margin
                 
-                // Create a rectangle shape for the color
+                // Create a rectangle shape for the color (smaller size)
                 const colorSwatch = document.createElement('div');
                 colorSwatch.style.backgroundColor = color;
-                colorSwatch.style.width = '40px';
-                colorSwatch.style.height = '40px';
+                colorSwatch.style.width = '30px';  // Smaller width
+                colorSwatch.style.height = '30px';  // Smaller height
                 colorSwatch.style.border = '2px solid #fff';
                 colorSwatch.style.borderRadius = '4px';
                 colorSwatch.style.boxSizing = 'border-box';
                 colorSwatch.title = color;
                 
-                // Add a label with the hex code
+                // Add a label with the hex code (smaller font)
                 const colorLabel = document.createElement('div');
                 colorLabel.textContent = color;
                 colorLabel.style.color = '#fff';
-                colorLabel.style.fontSize = '10px';
-                colorLabel.style.marginTop = '4px';
+                colorLabel.style.fontSize = '8px';  // Smaller font
+                colorLabel.style.marginTop = '2px';  // Reduced margin
                 colorLabel.style.fontFamily = 'Courier New, monospace';
                 colorLabel.style.textAlign = 'center';
+                colorLabel.style.maxWidth = '30px';
+                colorLabel.style.overflow = 'hidden';
+                colorLabel.style.textOverflow = 'ellipsis';
                 
                 swatchContainer.appendChild(colorSwatch);
                 swatchContainer.appendChild(colorLabel);

@@ -54,7 +54,7 @@ main {
     flex-direction: column;
     height: 100%;
     position: relative;
-    padding-bottom: 40px; /* Reduced space for status message */
+    padding-bottom: 30px; /* Reduced space for status message */
 }
 
 .screen-content {
@@ -164,7 +164,7 @@ main {
     align-items: center;
     text-align: center;
     padding-top: 5px;
-    padding-bottom: 80px; /* Increased space for email button */
+    padding-bottom: 60px; /* Reduced space for email button */
 }
 
 .celebration-header {
@@ -180,12 +180,14 @@ main {
 }
 
 .palette-display {
-    margin-bottom: 15px;
-    min-height: 80px; /* Reduced height */
+    margin-bottom: 10px; /* Reduced margin */
+    min-height: 60px; /* Reduced height */
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
+    max-height: 120px; /* Limit max height */
+    overflow: hidden; /* Prevent overflow */
 }
 
 .palette-container {
@@ -222,7 +224,7 @@ main {
     gap: 8px;
     width: 100%;
     position: absolute;
-    bottom: 45px; /* Moved up to avoid overlapping with status message */
+    bottom: 35px; /* Moved up to ensure visibility */
 }
 
 .action-button.email {
