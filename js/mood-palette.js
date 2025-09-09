@@ -284,8 +284,25 @@ function analyzeColorsFromImage() {
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
-        // Use catbox immediately for R1 testing since the LLM seems to expect a URL
-        fallbackToCatboxAnalysis();
+        // Try sending the image data directly to the LLM
+        // The LLM might be able to handle base64 image data
+        showStatus('SENDING IMAGE TO LLM...', 'info');
+        
+        const payload = {
+            message: "Analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
+            useLLM: true,
+            imageData: capturedImageData // Send the actual image data
+        };
+        
+        console.log('Sending image data to LLM, data length:', capturedImageData.length);
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
+        
+        // Set a timeout to show an error if we don't get a response
+        setTimeout(() => {
+            if (currentPalette.length === 0) {
+                showStatus('LLM ANALYSIS TIMED OUT', 'error');
+            }
+        }, 10000);
     } else {
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
@@ -430,6 +447,7 @@ window.onPluginMessage = function(data) {
     
     if (data.data) {
         try {
+            // Try to parse the data as JSON
             const parsedData = JSON.parse(data.data);
             console.log('Parsed data:', parsedData);
             
@@ -438,6 +456,10 @@ window.onPluginMessage = function(data) {
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+            } else if (parsedData.message && parsedData.message.includes('image URL')) {
+                // If the LLM is asking for an image URL, try to upload to catbox
+                showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
+                fallbackToCatboxAnalysis();
             } else {
                 // If we can't parse colors, show the raw data for debugging
                 console.log('No colors found in response, showing raw data');
@@ -445,11 +467,23 @@ window.onPluginMessage = function(data) {
             }
         } catch (e) {
             console.error('Error parsing plugin message:', e);
-            // Show the raw data if we can't parse it
-            showStatus('RESPONSE: ' + data.data, 'info');
+            // Check if the response contains a request for an image URL
+            if (data.data.includes('image URL') || data.data.includes('image url')) {
+                showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
+                fallbackToCatboxAnalysis();
+            } else {
+                // Show the raw data if we can't parse it
+                showStatus('RESPONSE: ' + data.data, 'info');
+            }
         }
     } else if (data.message) {
-        showStatus(data.message, 'info');
+        // Check if the message contains a request for an image URL
+        if (data.message.includes('image URL') || data.message.includes('image url')) {
+            showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
+            fallbackToCatboxAnalysis();
+        } else {
+            showStatus(data.message, 'info');
+        }
     } else {
         // Show raw data if no message or data
         showStatus('RECEIVED: ' + JSON.stringify(data), 'info');
@@ -482,24 +516,13 @@ async function fallbackToCatboxAnalysis() {
             
             // Send image URL to LLM for analysis with a more specific prompt
             const payload = {
-                message: `Please analyze the colors in this image: ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}`,
+                message: `Analyze the colors in this image: ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format must be valid JSON: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}`,
                 useLLM: true
             };
             
             PluginMessageHandler.postMessage(JSON.stringify(payload));
         } else {
-            // If upload failed, let's try to simulate a successful analysis for testing
-            console.log('Upload failed, simulating analysis for testing');
-            showStatus('UPLOAD FAILED, SIMULATING ANALYSIS...', 'info');
-            
-            // Simulate a successful analysis response after a delay
-            setTimeout(() => {
-                // Generate some sample colors for testing
-                const sampleColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
-                currentPalette = sampleColors;
-                displayPalette(currentPalette);
-                showStatus('SIMULATED PALETTE READY! EMAIL TO SEND', 'success');
-            }, 2000);
+            throw new Error('Failed to upload image');
         }
     } catch (error) {
         console.error('Fallback analysis error:', error);
