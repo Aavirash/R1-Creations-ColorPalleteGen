@@ -77,6 +77,11 @@ main {
     justify-content: center;
     overflow: hidden;
     position: relative;
+    cursor: pointer;
+}
+
+.preview-container.clickable {
+    background: #333;
 }
 
 .thumbnail-container {
@@ -99,6 +104,8 @@ main {
 .placeholder-text {
     color: #666;
     font-size: 12px;
+    text-align: center;
+    padding: 10px;
 }
 
 .controls-section {
@@ -197,19 +204,14 @@ main {
     width: 100%;
 }
 
-.email-input {
-    padding: 10px;
-    background: #222;
-    color: #fff;
-    border: 3px solid #0f0;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    width: 100%;
+.action-button.email {
+    background: #00f;
+    border-color: #ff0;
 }
 
-.email-input:focus {
-    outline: none;
-    border-color: #f00;
+.action-button.email:hover {
+    background: #ff0;
+    color: #000;
 }
 
 .status-message {
