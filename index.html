@@ -10,39 +10,53 @@
     <div id="app">
         <header>
             <h1>Color Palette</h1>
-            <button id="menuBtn" class="menu-button" aria-label="Menu">☰</button>
         </header>
-
-        <nav id="menuNav" class="menu-nav">
-            <button class="close-menu" id="closeMenu">×</button>
-            <ul>
-                <li><a href="#" data-page="mood-palette">Mood Palette</a></li>
-            </ul>
-        </nav>
 
         <main id="content">
             <div class="mood-palette-container">
-                <div class="camera-section">
-                    <video id="videoElement" autoplay playsinline width="220" height="165" style="display: none;"></video>
-                    <canvas id="canvasElement" style="display: none;"></canvas>
-                    <div id="previewContainer" class="preview-container">
-                        <div class="placeholder-text">Camera Preview</div>
+                <!-- Screen 1: Camera Preview -->
+                <div id="screen1" class="screen active">
+                    <div class="preview-section">
+                        <div id="previewContainer" class="preview-container">
+                            <div class="placeholder-text">Camera Preview</div>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-section">
+                        <button id="captureBtn" class="action-button">Capture Image</button>
                     </div>
                 </div>
                 
-                <div class="palette-display" id="paletteDisplay">
-                    <div class="placeholder-text">No palette generated yet</div>
+                <!-- Screen 2: Captured Image with Options -->
+                <div id="screen2" class="screen">
+                    <div class="preview-section">
+                        <div id="thumbnailContainer" class="thumbnail-container">
+                            <div class="placeholder-text">Captured Image</div>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-section">
+                        <button id="generateBtn" class="action-button">Generate Palette</button>
+                        <button id="recaptureBtn" class="action-button secondary">Capture Again</button>
+                    </div>
                 </div>
                 
-                <div class="controls-section">
-                    <button id="captureBtn" class="action-button">Capture Image</button>
-                    <button id="analyzeBtn" class="action-button" disabled>Analyze Colors</button>
-                    <button id="generateBtn" class="action-button" disabled>Generate Palette</button>
-                </div>
-                
-                <div class="email-section">
-                    <input type="email" id="emailInput" class="email-input" placeholder="your@email.com">
-                    <button id="emailBtn" class="action-button" disabled>Send Palette</button>
+                <!-- Screen 3: Color Palette Display -->
+                <div id="screen3" class="screen">
+                    <div class="palette-display-section">
+                        <div class="celebration-header">
+                            <h2>Your Palette</h2>
+                        </div>
+                        
+                        <div class="palette-display" id="paletteDisplay">
+                            <div class="placeholder-text">Generating palette...</div>
+                        </div>
+                        
+                        <div class="email-section">
+                            <input type="email" id="emailInput" class="email-input" placeholder="your@email.com">
+                            <button id="emailBtn" class="action-button">Email Me</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="status-message" id="statusMessage"></div>
@@ -51,41 +65,5 @@
     </div>
 
     <script src="js/mood-palette.js"></script>
-    <script>
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeNavigation();
-            initializeMoodPalette();
-        });
-
-        // Navigation system
-        function initializeNavigation() {
-            const menuBtn = document.getElementById('menuBtn');
-            const closeMenu = document.getElementById('closeMenu');
-            const menuNav = document.getElementById('menuNav');
-            const menuLinks = document.querySelectorAll('.menu-nav a');
-            
-            // Toggle menu
-            menuBtn.addEventListener('click', () => {
-                menuNav.classList.add('open');
-            });
-            
-            closeMenu.addEventListener('click', () => {
-                menuNav.classList.remove('open');
-            });
-            
-            // Handle menu navigation
-            menuLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    menuNav.classList.remove('open');
-                    
-                    // Update active state
-                    menuLinks.forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                });
-            });
-        }
-    </script>
 </body>
 </html>

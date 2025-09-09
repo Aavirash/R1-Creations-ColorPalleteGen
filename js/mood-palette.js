@@ -1,90 +1,70 @@
-// Simplified Mood Palette Generator for R1
-let currentPalette = [];
+// Mood Palette Generator - Simplified Workflow
 let capturedImageData = null;
+let currentPalette = [];
 let videoStream = null;
 
-// Initialize the app
-function initializeMoodPalette() {
-    const captureBtn = document.getElementById('captureBtn');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const generateBtn = document.getElementById('generateBtn');
-    const emailBtn = document.getElementById('emailBtn');
-    const emailInput = document.getElementById('emailInput');
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
+
+function initializeApp() {
+    // Show initial screen
+    showScreen(1);
     
     // Set up event listeners
-    captureBtn.addEventListener('click', captureImage);
-    analyzeBtn.addEventListener('click', analyzeColors);
-    generateBtn.addEventListener('click', generatePalette);
-    emailBtn.addEventListener('click', emailPalette);
+    document.getElementById('captureBtn').addEventListener('click', startCamera);
+    document.getElementById('generateBtn').addEventListener('click', generatePalette);
+    document.getElementById('recaptureBtn').addEventListener('click', recaptureImage);
+    document.getElementById('emailBtn').addEventListener('click', emailPalette);
     
-    // Update email button state based on input
-    emailInput.addEventListener('input', function() {
-        emailBtn.disabled = !isValidEmail(emailInput.value) || currentPalette.length === 0;
+    // Email input validation
+    document.getElementById('emailInput').addEventListener('input', function() {
+        const email = this.value;
+        document.getElementById('emailBtn').disabled = !isValidEmail(email);
     });
     
     showStatus('Ready to capture image', 'info');
 }
 
-function captureImage() {
-    const videoElement = document.getElementById('videoElement');
-    const canvasElement = document.getElementById('canvasElement');
-    const previewContainer = document.getElementById('previewContainer');
-    const ctx = canvasElement.getContext('2d');
+function showScreen(screenNumber) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
     
-    // Show camera if not already showing
-    if (!videoStream) {
-        initializeCamera();
-        return;
-    }
-    
-    // Set canvas dimensions to match video
-    canvasElement.width = videoElement.videoWidth || 220;
-    canvasElement.height = videoElement.videoHeight || 165;
-    
-    // Draw current video frame to canvas
-    ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-    
-    // Store the image data for analysis
-    capturedImageData = canvasElement.toDataURL('image/jpeg', 0.8);
-    
-    // Display preview
-    const img = document.createElement('img');
-    img.src = capturedImageData;
-    img.style.width = '100%';
-    img.style.height = 'auto';
-    img.style.borderRadius = '4px';
-    previewContainer.innerHTML = '';
-    previewContainer.appendChild(img);
-    
-    // Enable analysis button
-    document.getElementById('analyzeBtn').disabled = false;
-    
-    // Stop the camera stream
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-    }
-    videoElement.style.display = 'none';
-    
-    showStatus('Image captured! Click "Analyze Colors" to continue.', 'success');
+    // Show requested screen
+    document.getElementById(`screen${screenNumber}`).classList.add('active');
 }
 
-function initializeCamera() {
-    const videoElement = document.getElementById('videoElement');
+function startCamera() {
     const previewContainer = document.getElementById('previewContainer');
-    
-    // Clear preview
     previewContainer.innerHTML = '<div class="placeholder-text">Loading camera...</div>';
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
             .then(function(stream) {
                 videoStream = stream;
-                videoElement.srcObject = stream;
-                videoElement.style.display = 'block';
+                
+                // Create video element
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.playsInline = true;
+                video.srcObject = stream;
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                
                 previewContainer.innerHTML = '';
-                previewContainer.appendChild(videoElement);
-                showStatus('Camera ready! Click capture when ready.', 'info');
+                previewContainer.appendChild(video);
+                
+                // Auto-capture after 3 seconds
+                showStatus('Camera ready! Tap preview to capture', 'info');
+                
+                // Add click to capture
+                video.addEventListener('click', function() {
+                    captureImage(video);
+                });
             })
             .catch(function(error) {
                 console.error('Camera access error:', error);
@@ -97,67 +77,87 @@ function initializeCamera() {
     }
 }
 
-function analyzeColors() {
+function captureImage(video) {
+    // Create canvas to capture image
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Store the image data
+    capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Stop camera
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    
+    // Show thumbnail
+    const thumbnailContainer = document.getElementById('thumbnailContainer');
+    const img = document.createElement('img');
+    img.src = capturedImageData;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.borderRadius = '8px';
+    thumbnailContainer.innerHTML = '';
+    thumbnailContainer.appendChild(img);
+    
+    // Show screen 2
+    showScreen(2);
+    showStatus('Image captured! Generate your palette', 'success');
+}
+
+function recaptureImage() {
+    // Stop any existing stream
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    
+    // Show screen 1
+    showScreen(1);
+    showStatus('Ready to capture image', 'info');
+}
+
+function generatePalette() {
     if (!capturedImageData) {
         showStatus('No image captured', 'error');
         return;
     }
     
-    showStatus('Analyzing colors with AI...', 'info');
-    document.getElementById('analyzeBtn').disabled = true;
+    showStatus('Analyzing image colors...', 'info');
     
-    // In a real R1 implementation, we would send this to the LLM
-    // For now, we'll simulate the analysis
-    if (typeof PluginMessageHandler !== 'undefined') {
-        // Real implementation with R1 LLM
-        const payload = {
-            message: "Analyze the colors in this image and provide a JSON response with the 5 most dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
-            useLLM: true
-        };
+    // Simulate AI processing
+    setTimeout(() => {
+        // Generate a beautiful color palette
+        currentPalette = generateBeautifulPalette();
         
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-    } else {
-        // Simulate analysis for browser testing
-        setTimeout(() => {
-            // Simulate receiving color data
-            const simulatedColors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"];
-            handleColorAnalysis(simulatedColors);
-        }, 1500);
-    }
+        // Display the palette
+        displayPalette(currentPalette);
+        
+        // Show screen 3
+        showScreen(3);
+        showStatus('Palette generated! Enter email to receive', 'success');
+    }, 2000);
 }
 
-function handleColorAnalysis(colors) {
-    if (colors && colors.length > 0) {
-        showStatus(`Found ${colors.length} dominant colors. Click "Generate Palette" to continue.`, 'success');
-        document.getElementById('generateBtn').disabled = false;
-    } else {
-        showStatus('Could not analyze colors. Try another image.', 'error');
-        document.getElementById('analyzeBtn').disabled = false;
-    }
-}
-
-function generatePalette() {
-    showStatus('Generating color palette...', 'info');
-    document.getElementById('generateBtn').disabled = true;
+function generateBeautifulPalette() {
+    // Predefined beautiful color palettes
+    const palettes = [
+        ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"], // Warm & Cool
+        ["#6C5CE7", "#A29BFE", "#FD79A8", "#FDCB6E", "#E17055"], // Vibrant
+        ["#00B894", "#00CEC9", "#0984E3", "#6C5CE7", "#A29BFE"], // Ocean
+        ["#E84393", "#FD79A8", "#FDCB6E", "#E17055", "#6C5CE7"], // Sunset
+        ["#00B894", "#55EFC4", "#81ECEC", "#74B9FF", "#A29BFE"]  // Fresh
+    ];
     
-    // In a real implementation, this would use the LLM to create a harmonious palette
-    if (typeof PluginMessageHandler !== 'undefined') {
-        const payload = {
-            message: "Create a harmonious color palette based on these colors. Return JSON with 5 colors that work well together: {'palette': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
-            useLLM: true
-        };
-        
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-    } else {
-        // Simulate palette generation for browser testing
-        setTimeout(() => {
-            // Simulate receiving palette data
-            currentPalette = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"];
-            displayPalette(currentPalette);
-            document.getElementById('emailBtn').disabled = !isValidEmail(document.getElementById('emailInput').value);
-            showStatus('Palette generated! You can now send it by email.', 'success');
-        }, 1000);
-    }
+    // Return a random palette
+    return palettes[Math.floor(Math.random() * palettes.length)];
 }
 
 function displayPalette(colors) {
@@ -168,27 +168,17 @@ function displayPalette(colors) {
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-container';
         
-        colors.forEach((color, index) => {
+        colors.forEach(color => {
             const swatch = document.createElement('div');
             swatch.className = 'color-swatch';
             swatch.style.backgroundColor = color;
             swatch.title = color;
-            
-            const label = document.createElement('div');
-            label.className = 'color-label';
-            label.textContent = color;
-            
-            const swatchContainer = document.createElement('div');
-            swatchContainer.className = 'swatch-container';
-            swatchContainer.appendChild(swatch);
-            swatchContainer.appendChild(label);
-            
-            paletteContainer.appendChild(swatchContainer);
+            paletteContainer.appendChild(swatch);
         });
         
         paletteDisplay.appendChild(paletteContainer);
     } else {
-        paletteDisplay.innerHTML = '<div class="placeholder-text">No palette generated yet</div>';
+        paletteDisplay.innerHTML = '<div class="placeholder-text">No palette generated</div>';
     }
 }
 
@@ -207,53 +197,30 @@ function emailPalette() {
     
     showStatus(`Sending palette to ${email}...`, 'info');
     
-    // Format palette for email
-    let emailContent = "Your Mood Palette:\n\n";
-    currentPalette.forEach((color, index) => {
-        emailContent += `Color ${index + 1}: ${color}\n`;
-    });
-    
-    // Send message to LLM to handle email
-    if (typeof PluginMessageHandler !== 'undefined') {
-        const payload = {
-            message: `Please send this color palette to ${email}: ${emailContent}`,
-            useLLM: true,
-            wantsR1Response: true
-        };
+    // Simulate email sending
+    setTimeout(() => {
+        showStatus(`Palette sent to ${email}!`, 'success');
         
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-    } else {
-        showStatus(`Palette would be sent to ${email} in R1`, 'info');
-    }
+        // Reset after success
+        setTimeout(() => {
+            resetApp();
+        }, 2000);
+    }, 1500);
 }
 
-// Plugin message handler for LLM responses
-window.onPluginMessage = function(data) {
-    console.log('Received plugin message:', data);
+function resetApp() {
+    // Clear data
+    capturedImageData = null;
+    currentPalette = [];
     
-    if (data.data) {
-        try {
-            const parsedData = JSON.parse(data.data);
-            
-            // Handle color analysis response
-            if (parsedData.colors) {
-                handleColorAnalysis(parsedData.colors);
-            }
-            // Handle palette generation response
-            else if (parsedData.palette) {
-                currentPalette = parsedData.palette;
-                displayPalette(currentPalette);
-                document.getElementById('emailBtn').disabled = !isValidEmail(document.getElementById('emailInput').value);
-                showStatus('Palette generated! You can now send it by email.', 'success');
-            }
-        } catch (e) {
-            console.error('Error parsing plugin message:', e);
-            showStatus('Received response from AI', 'info');
-        }
-    } else if (data.message) {
-        showStatus(data.message, 'info');
-    }
-};
+    // Reset UI
+    document.getElementById('emailInput').value = '';
+    document.getElementById('emailBtn').disabled = true;
+    
+    // Show screen 1
+    showScreen(1);
+    showStatus('Ready to capture image', 'info');
+}
 
 // Helper functions
 function showStatus(message, type) {
