@@ -1,4 +1,4 @@
-// Mood Palette Generator - Simplified Workflow
+// Mood Palette Generator - Single Screen Workflow
 let capturedImageData = null;
 let currentPalette = [];
 let videoStream = null;
@@ -10,12 +10,90 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeApp() {
     // Show initial screen
-    showScreen(1);
+    showScreen1();
+    
+    showStatus('READY TO CAPTURE IMAGE', 'info');
+}
+
+function showScreen1() {
+    const appContent = document.getElementById('appContent');
+    appContent.innerHTML = `
+        <div class="screen-content">
+            <div class="preview-section">
+                <div id="previewContainer" class="preview-container">
+                    <div class="placeholder-text">CAMERA PREVIEW</div>
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <button id="captureBtn" class="action-button">CAPTURE IMAGE</button>
+            </div>
+        </div>
+    `;
+    
+    // Set up event listener
+    document.getElementById('captureBtn').addEventListener('click', startCamera);
+}
+
+function showScreen2() {
+    const appContent = document.getElementById('appContent');
+    appContent.innerHTML = `
+        <div class="screen-content">
+            <div class="preview-section">
+                <div id="thumbnailContainer" class="thumbnail-container">
+                    <div class="placeholder-text">IMG</div>
+                </div>
+                <div class="preview-container" style="height: 165px;">
+                    <div class="placeholder-text">IMAGE CAPTURED</div>
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <button id="generateBtn" class="action-button">GENERATE PALETTE</button>
+                <button id="recaptureBtn" class="action-button secondary">CAPTURE AGAIN</button>
+            </div>
+        </div>
+    `;
+    
+    // Show thumbnail if we have captured image
+    if (capturedImageData) {
+        const thumbnailContainer = document.getElementById('thumbnailContainer');
+        const img = document.createElement('img');
+        img.src = capturedImageData;
+        thumbnailContainer.innerHTML = '';
+        thumbnailContainer.appendChild(img);
+    }
     
     // Set up event listeners
-    document.getElementById('captureBtn').addEventListener('click', startCamera);
     document.getElementById('generateBtn').addEventListener('click', generatePalette);
-    document.getElementById('recaptureBtn').addEventListener('click', recaptureImage);
+    document.getElementById('recaptureBtn').addEventListener('click', showScreen1);
+}
+
+function showScreen3() {
+    const appContent = document.getElementById('appContent');
+    appContent.innerHTML = `
+        <div class="screen-content">
+            <div class="palette-display-section">
+                <div class="celebration-header">
+                    <h2>YOUR PALETTE</h2>
+                </div>
+                
+                <div class="palette-display" id="paletteDisplay">
+                    <div class="placeholder-text">GENERATING...</div>
+                </div>
+                
+                <div class="email-section">
+                    <input type="email" id="emailInput" class="email-input" placeholder="YOUR@EMAIL.COM">
+                    <button id="emailBtn" class="action-button">EMAIL ME</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Display the palette
+    displayPalette(currentPalette);
+    
+    // Set up event listeners
     document.getElementById('emailBtn').addEventListener('click', emailPalette);
     
     // Email input validation
@@ -23,23 +101,11 @@ function initializeApp() {
         const email = this.value;
         document.getElementById('emailBtn').disabled = !isValidEmail(email);
     });
-    
-    showStatus('Ready to capture image', 'info');
-}
-
-function showScreen(screenNumber) {
-    // Hide all screens
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
-    });
-    
-    // Show requested screen
-    document.getElementById(`screen${screenNumber}`).classList.add('active');
 }
 
 function startCamera() {
     const previewContainer = document.getElementById('previewContainer');
-    previewContainer.innerHTML = '<div class="placeholder-text">Loading camera...</div>';
+    previewContainer.innerHTML = '<div class="placeholder-text">LOADING CAMERA...</div>';
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
@@ -58,8 +124,7 @@ function startCamera() {
                 previewContainer.innerHTML = '';
                 previewContainer.appendChild(video);
                 
-                // Auto-capture after 3 seconds
-                showStatus('Camera ready! Tap preview to capture', 'info');
+                showStatus('CAMERA READY! TAP TO CAPTURE', 'info');
                 
                 // Add click to capture
                 video.addEventListener('click', function() {
@@ -68,12 +133,12 @@ function startCamera() {
             })
             .catch(function(error) {
                 console.error('Camera access error:', error);
-                showStatus('Camera access denied or unavailable', 'error');
-                previewContainer.innerHTML = '<div class="placeholder-text">Camera unavailable</div>';
+                showStatus('CAMERA ERROR', 'error');
+                previewContainer.innerHTML = '<div class="placeholder-text">CAMERA UNAVAILABLE</div>';
             });
     } else {
-        showStatus('Camera not supported in this browser', 'error');
-        previewContainer.innerHTML = '<div class="placeholder-text">Camera not supported</div>';
+        showStatus('CAMERA NOT SUPPORTED', 'error');
+        previewContainer.innerHTML = '<div class="placeholder-text">NO CAMERA</div>';
     }
 }
 
@@ -96,64 +161,38 @@ function captureImage(video) {
         videoStream = null;
     }
     
-    // Show thumbnail
-    const thumbnailContainer = document.getElementById('thumbnailContainer');
-    const img = document.createElement('img');
-    img.src = capturedImageData;
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.objectFit = 'cover';
-    img.style.borderRadius = '8px';
-    thumbnailContainer.innerHTML = '';
-    thumbnailContainer.appendChild(img);
-    
     // Show screen 2
-    showScreen(2);
-    showStatus('Image captured! Generate your palette', 'success');
-}
-
-function recaptureImage() {
-    // Stop any existing stream
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-    }
-    
-    // Show screen 1
-    showScreen(1);
-    showStatus('Ready to capture image', 'info');
+    showScreen2();
+    showStatus('IMAGE CAPTURED! GENERATE PALETTE', 'success');
 }
 
 function generatePalette() {
     if (!capturedImageData) {
-        showStatus('No image captured', 'error');
+        showStatus('NO IMAGE CAPTURED', 'error');
         return;
     }
     
-    showStatus('Analyzing image colors...', 'info');
+    showStatus('ANALYZING COLORS...', 'info');
     
     // Simulate AI processing
     setTimeout(() => {
         // Generate a beautiful color palette
         currentPalette = generateBeautifulPalette();
         
-        // Display the palette
-        displayPalette(currentPalette);
-        
         // Show screen 3
-        showScreen(3);
-        showStatus('Palette generated! Enter email to receive', 'success');
+        showScreen3();
+        showStatus('PALETTE READY! ENTER EMAIL', 'success');
     }, 2000);
 }
 
 function generateBeautifulPalette() {
     // Predefined beautiful color palettes
     const palettes = [
-        ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"], // Warm & Cool
-        ["#6C5CE7", "#A29BFE", "#FD79A8", "#FDCB6E", "#E17055"], // Vibrant
-        ["#00B894", "#00CEC9", "#0984E3", "#6C5CE7", "#A29BFE"], // Ocean
-        ["#E84393", "#FD79A8", "#FDCB6E", "#E17055", "#6C5CE7"], // Sunset
-        ["#00B894", "#55EFC4", "#81ECEC", "#74B9FF", "#A29BFE"]  // Fresh
+        ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"], // RGB Classic
+        ["#FF5733", "#33FF57", "#3357FF", "#F333FF", "#FF33A1"], // Vibrant
+        ["#FFD700", "#FF4500", "#32CD32", "#1E90FF", "#8A2BE2"], // Gold to Purple
+        ["#FF1493", "#00FF7F", "#FFD700", "#FF6347", "#4169E1"], // Pink to Blue
+        ["#FF0000", "#FFA500", "#FFFF00", "#008000", "#0000FF"]  // Rainbow
     ];
     
     // Return a random palette
@@ -178,7 +217,7 @@ function displayPalette(colors) {
         
         paletteDisplay.appendChild(paletteContainer);
     } else {
-        paletteDisplay.innerHTML = '<div class="placeholder-text">No palette generated</div>';
+        paletteDisplay.innerHTML = '<div class="placeholder-text">NO PALETTE</div>';
     }
 }
 
@@ -186,20 +225,20 @@ function emailPalette() {
     const email = document.getElementById('emailInput').value;
     
     if (!isValidEmail(email)) {
-        showStatus('Please enter a valid email address', 'error');
+        showStatus('ENTER VALID EMAIL', 'error');
         return;
     }
     
     if (currentPalette.length === 0) {
-        showStatus('No palette to send', 'error');
+        showStatus('NO PALETTE TO SEND', 'error');
         return;
     }
     
-    showStatus(`Sending palette to ${email}...`, 'info');
+    showStatus(`SENDING TO ${email.toUpperCase()}...`, 'info');
     
     // Simulate email sending
     setTimeout(() => {
-        showStatus(`Palette sent to ${email}!`, 'success');
+        showStatus(`PALETTE SENT!`, 'success');
         
         // Reset after success
         setTimeout(() => {
@@ -213,13 +252,9 @@ function resetApp() {
     capturedImageData = null;
     currentPalette = [];
     
-    // Reset UI
-    document.getElementById('emailInput').value = '';
-    document.getElementById('emailBtn').disabled = true;
-    
     // Show screen 1
-    showScreen(1);
-    showStatus('Ready to capture image', 'info');
+    showScreen1();
+    showStatus('READY TO CAPTURE IMAGE', 'info');
 }
 
 // Helper functions
