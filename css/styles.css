@@ -190,9 +190,10 @@ main {
 
 .palette-container {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .swatch-container {
@@ -202,15 +203,17 @@ main {
 }
 
 .color-swatch {
-    width: 30px;
-    height: 30px;
+    width: 40px;
+    height: 40px;
     border: 2px solid #fff;
+    border-radius: 4px;
 }
 
 .color-label {
-    font-size: 8px;
+    font-size: 10px;
     color: #aaa;
-    margin-top: 2px;
+    margin-top: 4px;
+    font-family: 'Courier New', monospace;
 }
 
 .email-section {

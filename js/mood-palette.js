@@ -296,13 +296,6 @@ function analyzeColorsFromImage() {
         
         console.log('Sending image data to LLM, data length:', capturedImageData.length);
         PluginMessageHandler.postMessage(JSON.stringify(payload));
-        
-        // Set a timeout to show an error if we don't get a response
-        setTimeout(() => {
-            if (currentPalette.length === 0) {
-                showStatus('LLM ANALYSIS TIMED OUT', 'error');
-            }
-        }, 10000);
     } else {
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
@@ -341,21 +334,28 @@ function displayPalette(colors) {
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-container';
         
-        colors.forEach(color => {
+        colors.forEach((color, index) => {
             const swatchContainer = document.createElement('div');
             swatchContainer.className = 'swatch-container';
             
+            // Create a rectangle shape for the color
             const colorSwatch = document.createElement('div');
             colorSwatch.className = 'color-swatch';
             colorSwatch.style.backgroundColor = color;
+            colorSwatch.style.width = '40px';
+            colorSwatch.style.height = '40px';
+            colorSwatch.style.border = '2px solid #fff';
+            colorSwatch.style.borderRadius = '4px';
             colorSwatch.title = color;
             
+            // Add a label with the hex code
             const colorLabel = document.createElement('div');
             colorLabel.className = 'color-label';
             colorLabel.textContent = color;
             colorLabel.style.color = '#fff';
             colorLabel.style.fontSize = '10px';
             colorLabel.style.marginTop = '4px';
+            colorLabel.style.fontFamily = 'Courier New, monospace';
             
             swatchContainer.appendChild(colorSwatch);
             swatchContainer.appendChild(colorLabel);
@@ -452,7 +452,7 @@ window.onPluginMessage = function(data) {
             console.log('Parsed data:', parsedData);
             
             // Handle color analysis response
-            if (parsedData.colors) {
+            if (parsedData.colors && Array.isArray(parsedData.colors)) {
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
@@ -551,19 +551,25 @@ function generatePaletteImage() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Set canvas dimensions to fit R1 screen
-            canvas.width = 220; // Slightly smaller than 240px width to account for borders
-            canvas.height = 80; // Reduced height
+            // Set canvas dimensions
+            canvas.width = 220;
+            canvas.height = 100;
             
-            // Fill background
+            // Fill background with black
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw title
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('COLOR PALETTE', canvas.width/2, 20);
             
             // Draw each color swatch
             const swatchWidth = 30;
             const swatchHeight = 30;
-            const spacing = 8;
-            const startY = 15;
+            const spacing = 10;
+            const startY = 35;
             
             // Calculate starting X position to center the palette
             const totalWidth = (swatchWidth * currentPalette.length) + (spacing * (currentPalette.length - 1));
@@ -579,14 +585,14 @@ function generatePaletteImage() {
                 
                 // Draw border
                 ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 1;
+                ctx.lineWidth = 2;
                 ctx.strokeRect(x, startY, swatchWidth, swatchHeight);
                 
                 // Draw color hex code below swatch
                 ctx.fillStyle = '#FFFFFF';
-                ctx.font = '8px Courier New';
+                ctx.font = '10px Courier New';
                 ctx.textAlign = 'center';
-                ctx.fillText(color, x + swatchWidth/2, startY + swatchHeight + 12);
+                ctx.fillText(color, x + swatchWidth/2, startY + swatchHeight + 15);
             });
             
             // Convert canvas to data URL
@@ -596,4 +602,26 @@ function generatePaletteImage() {
             reject(error);
         }
     });
+}
+
+// Function to create individual color shapes for verification
+function createColorShapes(colors) {
+    const shapesContainer = document.createElement('div');
+    shapesContainer.style.display = 'flex';
+    shapesContainer.style.justifyContent = 'space-around';
+    shapesContainer.style.marginTop = '10px';
+    
+    colors.forEach((color, index) => {
+        const shape = document.createElement('div');
+        shape.style.width = '40px';
+        shape.style.height = '40px';
+        shape.style.backgroundColor = color;
+        shape.style.border = '2px solid white';
+        shape.style.borderRadius = '4px';
+        shape.title = `Color ${index + 1}: ${color}`;
+        
+        shapesContainer.appendChild(shape);
+    });
+    
+    return shapesContainer;
 }
