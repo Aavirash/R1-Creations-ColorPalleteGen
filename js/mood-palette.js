@@ -337,12 +337,15 @@ function analyzeColorsFromImage() {
     }
     
     showStatus('ANALYZING COLORS...', 'info');
+    console.log('Analyzing colors. PluginMessageHandler available:', typeof PluginMessageHandler !== 'undefined');
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
+        console.log('Sending image directly to LLM');
         // Send image data directly to LLM for analysis
         sendImageToLLM();
     } else {
+        console.log('Simulating analysis for browser testing');
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
             // Generate colors based on actual image analysis simulation
@@ -530,9 +533,12 @@ window.onPluginMessage = function(data) {
                 resetApp();
             }, 2000);
         } 
-        // Handle case where LLM requests image URL (fallback)
-        else if (data.message.includes('image') && data.message.includes('url')) {
+        // Handle case where LLM requests image URL (fallback) - make this more specific
+        else if (data.message.includes('Please provide an image URL') || 
+                 data.message.includes('need an image URL') ||
+                 data.message.includes('upload the image')) {
             showStatus('LLM REQUESTS IMAGE URL - UPLOADING...', 'info');
+            console.log('LLM requested image URL, using catbox fallback');
             // Use catbox as fallback only when LLM explicitly requests it
             fallbackToCatboxAnalysis();
         } else if (data.message.includes('timeout') || data.message.includes('failed') || data.message.includes('error')) {
@@ -646,6 +652,9 @@ function sendImageToLLM() {
     showStatus('SENDING IMAGE TO LLM...', 'info');
     
     try {
+        // Log the image data info for debugging
+        console.log('Sending image to LLM. Image data length:', capturedImageData ? capturedImageData.length : 'null');
+        
         // Send image data directly to LLM for analysis
         const payload = {
             message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}.`,
@@ -654,8 +663,9 @@ function sendImageToLLM() {
             imageData: capturedImageData  // Send image data directly
         };
         
-        console.log('Sending image to LLM');
+        console.log('Sending image to LLM with payload:', JSON.stringify(payload, null, 2));
         PluginMessageHandler.postMessage(JSON.stringify(payload));
+        showStatus('IMAGE SENT TO LLM. WAITING FOR RESPONSE...', 'info');
     } catch (error) {
         console.error('Error sending image to LLM:', error);
         showStatus('LLM COMMUNICATION FAILED', 'error');
