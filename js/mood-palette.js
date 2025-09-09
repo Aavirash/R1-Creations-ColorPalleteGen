@@ -222,22 +222,8 @@ function analyzeColorsFromImage() {
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
-        // Try R1 LLM vision analysis first
-        const payload = {
-            message: "Analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
-            useLLM: true,
-            imageData: capturedImageData // Send the actual image data
-        };
-        
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-        
-        // Set a timeout to fallback to catbox if needed
-        setTimeout(() => {
-            // If we still don't have a palette after 5 seconds, try catbox fallback
-            if (currentPalette.length === 0) {
-                fallbackToCatboxAnalysis();
-            }
-        }, 5000);
+        // Use catbox immediately for R1 testing since the LLM seems to expect a URL
+        fallbackToCatboxAnalysis();
     } else {
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
@@ -412,13 +398,14 @@ function isValidEmail(email) {
 
 // Fallback function to use catbox for image hosting and analysis
 async function fallbackToCatboxAnalysis() {
-    showStatus('USING FALLBACK ANALYSIS...', 'info');
+    showStatus('UPLOADING IMAGE FOR ANALYSIS...', 'info');
     
     try {
         // Upload image to catbox
         const imageUrl = await uploadToCatbox(capturedImageData);
         
         if (imageUrl) {
+            showStatus('ANALYZING COLORS...', 'info');
             // Send image URL to LLM for analysis
             const payload = {
                 message: `Analyze the colors in this image at ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}`,
