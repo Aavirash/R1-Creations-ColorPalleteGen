@@ -49,12 +49,9 @@ function showScreen2() {
     appContent.innerHTML = `
         <div class="screen-content">
             <div class="preview-section">
-                <div class="preview-container" style="height: 165px;">
+                <div class="preview-container" style="height: 150px;">
                     <div id="thumbnailContainer" class="thumbnail-container">
                         <div class="placeholder-text">IMG</div>
-                    </div>
-                    <div class="placeholder-text" style="position: absolute; bottom: 10px; left: 100px; right: 10px; text-align: center;">
-                        IMAGE CAPTURED
                     </div>
                 </div>
             </div>
@@ -171,6 +168,50 @@ function captureImageFromPTT() {
     showStatus('IMAGE CAPTURED! GENERATE PALETTE', 'success');
 }
 
+// Function to upload image to catbox.moe
+async function uploadToCatbox(imageData) {
+    try {
+        // Convert data URL to Blob
+        const blob = dataURLToBlob(imageData);
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append('reqtype', 'fileupload');
+        formData.append('fileToUpload', blob, 'image.jpg');
+        
+        // Upload to catbox
+        const response = await fetch('https://catbox.moe/user/api.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const url = await response.text();
+            return url;
+        } else {
+            throw new Error('Upload failed');
+        }
+    } catch (error) {
+        console.error('Catbox upload error:', error);
+        return null;
+    }
+}
+
+// Helper function to convert data URL to Blob
+function dataURLToBlob(dataURL) {
+    const parts = dataURL.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    
+    for (let i = 0; i < rawLength; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+    }
+    
+    return new Blob([uInt8Array], { type: contentType });
+}
+
 function analyzeColorsFromImage() {
     if (!capturedImageData) {
         showStatus('NO IMAGE CAPTURED', 'error');
@@ -181,14 +222,22 @@ function analyzeColorsFromImage() {
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
-        // Real implementation with R1 LLM
+        // Try R1 LLM vision analysis first
         const payload = {
             message: "Analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
-            useLLM: true
+            useLLM: true,
+            imageData: capturedImageData // Send the actual image data
         };
         
-        // We would send the image data as well, but for now we'll just send the request
         PluginMessageHandler.postMessage(JSON.stringify(payload));
+        
+        // Set a timeout to fallback to catbox if needed
+        setTimeout(() => {
+            // If we still don't have a palette after 5 seconds, try catbox fallback
+            if (currentPalette.length === 0) {
+                fallbackToCatboxAnalysis();
+            }
+        }, 5000);
     } else {
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
@@ -228,16 +277,33 @@ function displayPalette(colors) {
         paletteContainer.className = 'palette-container';
         
         colors.forEach(color => {
-            const swatch = document.createElement('div');
-            swatch.className = 'color-swatch';
-            swatch.style.backgroundColor = color;
-            swatch.title = color;
-            paletteContainer.appendChild(swatch);
+            const swatchContainer = document.createElement('div');
+            swatchContainer.className = 'swatch-container';
+            
+            const colorSwatch = document.createElement('div');
+            colorSwatch.className = 'color-swatch';
+            colorSwatch.style.backgroundColor = color;
+            colorSwatch.title = color;
+            
+            const colorLabel = document.createElement('div');
+            colorLabel.className = 'color-label';
+            colorLabel.textContent = color;
+            colorLabel.style.color = '#fff';
+            colorLabel.style.fontSize = '10px';
+            colorLabel.style.marginTop = '4px';
+            
+            swatchContainer.appendChild(colorSwatch);
+            swatchContainer.appendChild(colorLabel);
+            paletteContainer.appendChild(swatchContainer);
         });
         
         paletteDisplay.appendChild(paletteContainer);
+        
+        // Update currentPalette with the received colors
+        currentPalette = colors;
     } else {
         paletteDisplay.innerHTML = '<div class="placeholder-text">NO COLORS FOUND</div>';
+        currentPalette = [];
     }
 }
 
@@ -257,14 +323,28 @@ function emailPalette() {
             paletteDescription += `Color ${index + 1}: ${color}\n`;
         });
         
-        // R1 LLM should know the user's email, so we just ask it to send
-        const payload = {
-            message: `Please send this color palette to the user's email: ${paletteDescription}`,
-            useLLM: true,
-            wantsR1Response: true
-        };
-        
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
+        // Also generate a visual representation of the palette
+        generatePaletteImage().then(imageDataUrl => {
+            // R1 LLM should know the user's email, so we just ask it to send
+            const payload = {
+                message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
+                useLLM: true,
+                wantsR1Response: true,
+                paletteImage: imageDataUrl // Send the visual palette as well
+            };
+            
+            PluginMessageHandler.postMessage(JSON.stringify(payload));
+        }).catch(error => {
+            console.error('Error generating palette image:', error);
+            // Fallback to text-only if image generation fails
+            const payload = {
+                message: `Please send this color palette to the user's email. Palette colors: ${paletteDescription}`,
+                useLLM: true,
+                wantsR1Response: true
+            };
+            
+            PluginMessageHandler.postMessage(JSON.stringify(payload));
+        });
     } else {
         // Simulate email sending
         setTimeout(() => {
@@ -328,4 +408,84 @@ function showStatus(message, type) {
 function isValidEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
+}
+
+// Fallback function to use catbox for image hosting and analysis
+async function fallbackToCatboxAnalysis() {
+    showStatus('USING FALLBACK ANALYSIS...', 'info');
+    
+    try {
+        // Upload image to catbox
+        const imageUrl = await uploadToCatbox(capturedImageData);
+        
+        if (imageUrl) {
+            // Send image URL to LLM for analysis
+            const payload = {
+                message: `Analyze the colors in this image at ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}`,
+                useLLM: true
+            };
+            
+            PluginMessageHandler.postMessage(JSON.stringify(payload));
+        } else {
+            throw new Error('Failed to upload image');
+        }
+    } catch (error) {
+        console.error('Fallback analysis error:', error);
+        showStatus('ANALYSIS FAILED', 'error');
+    }
+}
+
+// Function to generate a PNG image of the color palette
+function generatePaletteImage() {
+    return new Promise((resolve, reject) => {
+        try {
+            // Create a canvas to draw the palette
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas dimensions
+            canvas.width = 240; // Width of the R1 screen
+            canvas.height = 100; // Height for the palette
+            
+            // Fill background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw each color swatch
+            const swatchWidth = 40;
+            const swatchHeight = 40;
+            const spacing = 10;
+            const startY = 20;
+            
+            // Calculate starting X position to center the palette
+            const totalWidth = (swatchWidth * currentPalette.length) + (spacing * (currentPalette.length - 1));
+            let startX = (canvas.width - totalWidth) / 2;
+            
+            // Draw each color swatch
+            currentPalette.forEach((color, index) => {
+                const x = startX + (index * (swatchWidth + spacing));
+                
+                // Draw swatch
+                ctx.fillStyle = color;
+                ctx.fillRect(x, startY, swatchWidth, swatchHeight);
+                
+                // Draw border
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, startY, swatchWidth, swatchHeight);
+                
+                // Draw color hex code below swatch
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(color, x + swatchWidth/2, startY + swatchHeight + 15);
+            });
+            
+            // Convert canvas to data URL
+            const imageDataUrl = canvas.toDataURL('image/png');
+            resolve(imageDataUrl);
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
