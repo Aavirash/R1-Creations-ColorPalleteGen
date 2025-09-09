@@ -1,47 +1,9 @@
-// Mood Palette Generator for R1 - Integrated with SDK
+// Simplified Mood Palette Generator for R1
 let currentPalette = [];
 let capturedImageData = null;
 let videoStream = null;
 
-function loadMoodPalettePage(container) {
-    container.innerHTML = `
-        <div class="mood-palette-container">
-            <div class="camera-section">
-                <video id="videoElement" autoplay playsinline width="220" height="165" style="display: none;"></video>
-                <canvas id="canvasElement" style="display: none;"></canvas>
-                <div id="previewContainer" class="preview-container">
-                    <div class="placeholder-text">Camera Preview</div>
-                </div>
-            </div>
-            
-            <div class="palette-display" id="paletteDisplay">
-                <div class="placeholder-text">No palette generated yet</div>
-            </div>
-            
-            <div class="controls-section">
-                <button id="captureBtn" class="action-button">Capture Image</button>
-                <button id="analyzeBtn" class="action-button" disabled>Analyze Colors</button>
-                <button id="generateBtn" class="action-button" disabled>Generate Palette</button>
-            </div>
-            
-            <div class="email-section">
-                <input type="email" id="emailInput" class="email-input" placeholder="your@email.com">
-                <button id="emailBtn" class="action-button" disabled>Send Palette</button>
-            </div>
-            
-            <div class="status-message" id="statusMessage"></div>
-        </div>
-    `;
-    
-    // Store reference to this module
-    pageModules.moodPalette = {
-        handleMessage: handlePluginMessage
-    };
-    
-    // Initialize the app
-    initializeMoodPalette();
-}
-
+// Initialize the app
 function initializeMoodPalette() {
     const captureBtn = document.getElementById('captureBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -153,7 +115,6 @@ function analyzeColors() {
             useLLM: true
         };
         
-        // We would send the image data as well, but for now we'll just send the request
         PluginMessageHandler.postMessage(JSON.stringify(payload));
     } else {
         // Simulate analysis for browser testing
@@ -267,7 +228,7 @@ function emailPalette() {
 }
 
 // Plugin message handler for LLM responses
-function handlePluginMessage(data) {
+window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
     
     if (data.data) {
@@ -292,7 +253,7 @@ function handlePluginMessage(data) {
     } else if (data.message) {
         showStatus(data.message, 'info');
     }
-}
+};
 
 // Helper functions
 function showStatus(message, type) {

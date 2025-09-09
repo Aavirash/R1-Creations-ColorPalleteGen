@@ -3,38 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
-    <title>R1 Creations Test App</title>
+    <title>Mood Palette Generator</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>R1 Test</h1>
+            <h1>Color Palette</h1>
             <button id="menuBtn" class="menu-button" aria-label="Menu">☰</button>
         </header>
 
         <nav id="menuNav" class="menu-nav">
             <button class="close-menu" id="closeMenu">×</button>
             <ul>
-                <li><a href="#" data-page="hardware">Hardware</a></li>
-                <li><a href="#" data-page="data">Data</a></li>
-                <li><a href="#" data-page="speak">Speak</a></li>
                 <li><a href="#" data-page="mood-palette">Mood Palette</a></li>
             </ul>
         </nav>
 
         <main id="content">
-            <div class="welcome">
-                <h2>Welcome</h2>
-                <p>Select an option from the menu to begin testing.</p>
+            <div class="mood-palette-container">
+                <div class="camera-section">
+                    <video id="videoElement" autoplay playsinline width="220" height="165" style="display: none;"></video>
+                    <canvas id="canvasElement" style="display: none;"></canvas>
+                    <div id="previewContainer" class="preview-container">
+                        <div class="placeholder-text">Camera Preview</div>
+                    </div>
+                </div>
+                
+                <div class="palette-display" id="paletteDisplay">
+                    <div class="placeholder-text">No palette generated yet</div>
+                </div>
+                
+                <div class="controls-section">
+                    <button id="captureBtn" class="action-button">Capture Image</button>
+                    <button id="analyzeBtn" class="action-button" disabled>Analyze Colors</button>
+                    <button id="generateBtn" class="action-button" disabled>Generate Palette</button>
+                </div>
+                
+                <div class="email-section">
+                    <input type="email" id="emailInput" class="email-input" placeholder="your@email.com">
+                    <button id="emailBtn" class="action-button" disabled>Send Palette</button>
+                </div>
+                
+                <div class="status-message" id="statusMessage"></div>
             </div>
         </main>
     </div>
 
-    <script src="js/app.js"></script>
-    <script src="js/hardware.js"></script>
-    <script src="js/data.js"></script>
-    <script src="js/speak.js"></script>
     <script src="js/mood-palette.js"></script>
+    <script>
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeNavigation();
+            initializeMoodPalette();
+        });
+
+        // Navigation system
+        function initializeNavigation() {
+            const menuBtn = document.getElementById('menuBtn');
+            const closeMenu = document.getElementById('closeMenu');
+            const menuNav = document.getElementById('menuNav');
+            const menuLinks = document.querySelectorAll('.menu-nav a');
+            
+            // Toggle menu
+            menuBtn.addEventListener('click', () => {
+                menuNav.classList.add('open');
+            });
+            
+            closeMenu.addEventListener('click', () => {
+                menuNav.classList.remove('open');
+            });
+            
+            // Handle menu navigation
+            menuLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    menuNav.classList.remove('open');
+                    
+                    // Update active state
+                    menuLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                });
+            });
+        }
+    </script>
 </body>
 </html>
