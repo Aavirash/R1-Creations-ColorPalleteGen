@@ -230,72 +230,129 @@ function captureImageFromPTT() {
     showStatus('IMAGE CAPTURED! GENERATE PALETTE', 'success');
 }
 
-// Function to upload image to catbox.moe
-async function uploadToCatbox(imageData) {
-    try {
-        showStatus('UPLOADING TO CATBOX...', 'info');
-        console.log('Starting image upload to catbox');
-        
-        // Validate image data
-        if (!imageData) {
-            throw new Error('No image data provided');
-        }
-        
-        // Convert data URL to Blob
-        const blob = dataURLToBlob(imageData);
-        console.log('Blob created, size:', blob.size, 'type:', blob.type);
-        
-        // Check if blob is valid
-        if (blob.size === 0) {
-            throw new Error('Image blob is empty');
-        }
-        
-        // Create FormData
-        const formData = new FormData();
-        formData.append('reqtype', 'fileupload');
-        formData.append('fileToUpload', blob, 'image.jpg');
-        
-        // Try to upload to catbox with timeout and error handling
-        console.log('Sending request to catbox.moe');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
-        const response = await fetch('https://catbox.moe/user/api.php', {
-            method: 'POST',
-            body: formData,
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log('Catbox response status:', response.status);
-        
-        if (response.ok) {
-            const responseText = await response.text();
-            const url = responseText.trim();
-            console.log('Image uploaded successfully to:', url);
-            
-            // Validate that we got a URL
-            if (url && url.length > 0 && (url.startsWith('http://') || url.startsWith('https://'))) {
-                showStatus('IMAGE UPLOADED SUCCESSFULLY', 'success');
-                return url;
-            } else {
-                throw new Error('Invalid URL received from catbox: ' + responseText);
+// Function to upload image to multiple fallback services
+async function uploadToImageHost(imageData) {
+    const services = [
+        {
+            name: 'catbox',
+            url: 'https://catbox.moe/user/api.php',
+            formData: (blob) => {
+                const formData = new FormData();
+                formData.append('reqtype', 'fileupload');
+                formData.append('fileToUpload', blob, 'image.jpg');
+                return formData;
             }
-        } else {
-            const errorText = await response.text();
-            throw new Error('Upload failed with status: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
+        },
+        {
+            name: 'imgur',
+            url: 'https://api.imgur.com/3/image',
+            headers: {
+                'Authorization': 'Client-ID 546c223def8fc9a' // Anonymous client ID
+            },
+            formData: (blob) => {
+                const formData = new FormData();
+                formData.append('image', blob);
+                return formData;
+            }
+        },
+        {
+            name: 'freeimagehost',
+            url: 'https://freeimage.host/api/1/upload',
+            formData: (blob) => {
+                const formData = new FormData();
+                formData.append('key', '6d207e02198a847aa98d0a2a901485a5'); // Public key
+                formData.append('source', blob);
+                formData.append('format', 'txt');
+                return formData;
+            }
         }
-    } catch (error) {
-        console.error('Catbox upload error:', error);
-        if (error.name === 'AbortError') {
-            showStatus('UPLOAD TIMED OUT - CHECK NETWORK', 'error');
-        } else if (error.message.includes('fetch')) {
-            showStatus('NETWORK ERROR - CATBOX UNAVAILABLE', 'error');
-        } else {
-            showStatus('UPLOAD FAILED: ' + error.message, 'error');
+    ];
+    
+    showStatus('UPLOADING IMAGE...', 'info');
+    
+    for (let i = 0; i < services.length; i++) {
+        const service = services[i];
+        try {
+            showStatus(`UPLOADING TO ${service.name.toUpperCase()}...`, 'info');
+            console.log(`Trying to upload to ${service.name}`);
+            
+            // Convert data URL to Blob
+            const blob = dataURLToBlob(imageData);
+            console.log('Blob created, size:', blob.size, 'type:', blob.type);
+            
+            // Check if blob is valid
+            if (blob.size === 0) {
+                throw new Error('Image blob is empty');
+            }
+            
+            // Create FormData
+            const formData = service.formData(blob);
+            
+            // Try to upload with timeout
+            console.log('Sending request to', service.name);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            
+            const fetchOptions = {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            };
+            
+            // Add headers if specified
+            if (service.headers) {
+                fetchOptions.headers = service.headers;
+            }
+            
+            const response = await fetch(service.url, fetchOptions);
+            
+            clearTimeout(timeoutId);
+            
+            console.log(`${service.name} response status:`, response.status);
+            
+            if (response.ok) {
+                let url;
+                if (service.name === 'imgur') {
+                    const data = await response.json();
+                    url = data.data.link;
+                } else if (service.name === 'freeimagehost') {
+                    url = await response.text();
+                } else {
+                    const responseText = await response.text();
+                    url = responseText.trim();
+                }
+                
+                console.log('Image uploaded successfully to:', url);
+                
+                // Validate that we got a URL
+                if (url && url.length > 0 && (url.startsWith('http://') || url.startsWith('https://'))) {
+                    showStatus(`UPLOADED TO ${service.name.toUpperCase()} SUCCESSFULLY`, 'success');
+                    return { url, service: service.name };
+                } else {
+                    throw new Error(`Invalid URL received from ${service.name}: ${url}`);
+                }
+            } else {
+                const errorText = await response.text();
+                throw new Error(`Upload failed with status: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error(`Error uploading to ${service.name}:`, error);
+            if (i === services.length - 1) {
+                // Last service, throw the error
+                if (error.name === 'AbortError') {
+                    showStatus('UPLOAD TIMED OUT - CHECK NETWORK', 'error');
+                } else if (error.message.includes('fetch')) {
+                    showStatus('NETWORK ERROR - UPLOAD SERVICE UNAVAILABLE', 'error');
+                } else {
+                    showStatus('UPLOAD FAILED: ' + error.message, 'error');
+                }
+                throw error;
+            } else {
+                // Try next service
+                showStatus(`FAILED ${service.name.toUpperCase()}, TRYING NEXT...`, 'info');
+                continue;
+            }
         }
-        throw error;
     }
 }
 
@@ -537,16 +594,16 @@ window.onPluginMessage = function(data) {
                 resetApp();
             }, 2000);
         } 
-        // Handle case where LLM requests image URL (fallback) - make this more comprehensive
+        // Handle case where LLM requests image URL (fallback) - use new multi-service function
         else if (data.message.includes('image') && 
                 (data.message.includes('url') || 
                  data.message.includes('link') || 
                  data.message.includes('file') ||
                  data.message.includes('upload'))) {
             showStatus('LLM NEEDS IMAGE URL - UPLOADING...', 'info');
-            console.log('LLM requested image URL, using catbox fallback');
-            // Use catbox as fallback only when LLM explicitly requests it
-            fallbackToCatboxAnalysis();
+            console.log('LLM requested image URL, using multi-service fallback');
+            // Use multi-service fallback only when LLM explicitly requests it
+            fallbackToImageHostAnalysis();
         } else if (data.message.includes('timeout') || data.message.includes('failed') || data.message.includes('error')) {
             showStatus('LLM ERROR: ' + data.message, 'error');
         } else {
@@ -678,9 +735,9 @@ function sendImageToLLM() {
     }
 }
 
-// Fallback function to use catbox for image hosting and analysis (only when LLM requests it)
-async function fallbackToCatboxAnalysis() {
-    showStatus('UPLOADING IMAGE TO CATBOX...', 'info');
+// Fallback function to use multiple image hosting services (only when LLM requests it)
+async function fallbackToImageHostAnalysis() {
+    showStatus('UPLOADING IMAGE TO HOST...', 'info');
     
     try {
         // Check if we have image data
@@ -695,21 +752,21 @@ async function fallbackToCatboxAnalysis() {
             throw new Error('Captured image data is too small');
         }
         
-        // Upload image to catbox
-        const imageUrl = await uploadToCatbox(capturedImageData);
+        // Upload image to fallback services
+        const { url, service } = await uploadToImageHost(capturedImageData);
         
-        if (imageUrl && imageUrl.length > 0) {
-            showStatus('IMAGE UPLOADED! REQUESTING ANALYSIS...', 'info');
-            console.log('Image uploaded to:', imageUrl);
+        if (url && url.length > 0) {
+            showStatus(`IMAGE UPLOADED TO ${service.toUpperCase()}! REQUESTING ANALYSIS...`, 'info');
+            console.log('Image uploaded to:', url);
             
             // Validate URL before sending to LLM
-            if (!imageUrl.startsWith('http')) {
+            if (!url.startsWith('http')) {
                 throw new Error('Invalid image URL received');
             }
             
             // Send image URL to LLM for analysis with clearer instructions
             const payload = {
-                message: `I've uploaded the image to ${imageUrl}. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}.`,
+                message: `I've uploaded the image to ${url} using ${service}. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}.`,
                 useLLM: true,
                 wantsR1Response: false  // Set to false to get JSON response
             };
@@ -718,10 +775,10 @@ async function fallbackToCatboxAnalysis() {
             showStatus('REQUESTING COLOR ANALYSIS...', 'info');
             PluginMessageHandler.postMessage(JSON.stringify(payload));
         } else {
-            throw new Error('Failed to get image URL from catbox');
+            throw new Error('Failed to get image URL from hosting service');
         }
     } catch (error) {
-        console.error('Catbox analysis error:', error);
+        console.error('Image hosting analysis error:', error);
         showStatus('ANALYSIS FAILED: ' + error.message, 'error');
     }
 }
