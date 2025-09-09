@@ -171,6 +171,8 @@ function captureImageFromPTT() {
 // Function to upload image to catbox.moe
 async function uploadToCatbox(imageData) {
     try {
+        showStatus('UPLOADING IMAGE...', 'info');
+        
         // Convert data URL to Blob
         const blob = dataURLToBlob(imageData);
         
@@ -187,29 +189,40 @@ async function uploadToCatbox(imageData) {
         
         if (response.ok) {
             const url = await response.text();
+            console.log('Image uploaded to:', url);
             return url;
         } else {
-            throw new Error('Upload failed');
+            throw new Error('Upload failed with status: ' + response.status);
         }
     } catch (error) {
         console.error('Catbox upload error:', error);
+        showStatus('UPLOAD FAILED: ' + error.message, 'error');
         return null;
     }
 }
 
 // Helper function to convert data URL to Blob
 function dataURLToBlob(dataURL) {
-    const parts = dataURL.split(';base64,');
-    const contentType = parts[0].split(':')[1];
-    const raw = atob(parts[1]);
-    const rawLength = raw.length;
-    const uInt8Array = new Uint8Array(rawLength);
-    
-    for (let i = 0; i < rawLength; ++i) {
-        uInt8Array[i] = raw.charCodeAt(i);
+    try {
+        const parts = dataURL.split(';base64,');
+        if (parts.length !== 2) {
+            throw new Error('Invalid data URL format');
+        }
+        
+        const contentType = parts[0].split(':')[1];
+        const raw = atob(parts[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        
+        for (let i = 0; i < rawLength; ++i) {
+            uInt8Array[i] = raw.charCodeAt(i);
+        }
+        
+        return new Blob([uInt8Array], { type: contentType || 'image/jpeg' });
+    } catch (error) {
+        console.error('Error converting data URL to Blob:', error);
+        throw error;
     }
-    
-    return new Blob([uInt8Array], { type: contentType });
 }
 
 function analyzeColorsFromImage() {
@@ -364,23 +377,33 @@ function resetApp() {
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
+    showStatus('RECEIVED AI RESPONSE', 'info');
     
     if (data.data) {
         try {
             const parsedData = JSON.parse(data.data);
+            console.log('Parsed data:', parsedData);
             
             // Handle color analysis response
             if (parsedData.colors) {
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+            } else {
+                // If we can't parse colors, show the raw data for debugging
+                console.log('No colors found in response, showing raw data');
+                showStatus('RESPONSE: ' + data.data, 'info');
             }
         } catch (e) {
             console.error('Error parsing plugin message:', e);
-            showStatus('RECEIVED AI RESPONSE', 'info');
+            // Show the raw data if we can't parse it
+            showStatus('RESPONSE: ' + data.data, 'info');
         }
     } else if (data.message) {
         showStatus(data.message, 'info');
+    } else {
+        // Show raw data if no message or data
+        showStatus('RECEIVED: ' + JSON.stringify(data), 'info');
     }
 };
 
@@ -406,9 +429,11 @@ async function fallbackToCatboxAnalysis() {
         
         if (imageUrl) {
             showStatus('ANALYZING COLORS...', 'info');
-            // Send image URL to LLM for analysis
+            console.log('Sending image URL to LLM:', imageUrl);
+            
+            // Send image URL to LLM for analysis with a more specific prompt
             const payload = {
-                message: `Analyze the colors in this image at ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}`,
+                message: `Please analyze the colors in this image: ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}`,
                 useLLM: true
             };
             
@@ -418,7 +443,7 @@ async function fallbackToCatboxAnalysis() {
         }
     } catch (error) {
         console.error('Fallback analysis error:', error);
-        showStatus('ANALYSIS FAILED', 'error');
+        showStatus('ANALYSIS FAILED: ' + error.message, 'error');
     }
 }
 
