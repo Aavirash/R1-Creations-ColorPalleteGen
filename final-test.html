@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Test - Mood Palette Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        button {
+            padding: 10px 15px;
+            background-color: #007cba;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+    </style>
+</head>
+<body>
+    <h1>Final Test - Mood Palette Generator</h1>
+    
+    <div class="test-section">
+        <h2>1. Plugin Access Test</h2>
+        <p>Click the link below to test the Mood Palette Generator:</p>
+        <a href="http://localhost:8000/plugin-demo/mood-palette/" target="_blank">Open Mood Palette Generator</a>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. QR Code Test</h2>
+        <p>Scan this QR code with your R1 device:</p>
+        <iframe src="http://localhost:8000/qr/final/index_fixed.html?jsondata=eyJ0aXRsZSI6Ik1vb2QgUGFsZXR0ZSBHZW5lcmF0b3IiLCJ1cmwiOiJodHRwOi8vbG9jYWxob3N0OjgwMDAvcGx1Z2luLWRlbW8vbW9vZC1wYWxldHRlLyIsImRlc2NyaXB0aW9uIjoiQ2FwdHVyZSBpbWFnZXMgYW5kIGdlbmVyYXRlIEFJLXBvd2VyZWQgY29sb3IgcGFsZXR0ZXMgd2l0aCB0aGUgUjEgZGV2aWNlIiwiaWNvblVybCI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODAwMC9wbHVnaW4tZGVtby9tb29kLXBhbGV0dGUvaW1hZ2VzL2ljb24ucG5nIiwidGhlbWVDb2xvciI6IiNGRTUwMDAifQo" width="400" height="500" frameborder="0"></iframe>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Component Verification</h2>
+        <button id="verifyBtn">Run Verification</button>
+        <div id="verificationResults"></div>
+    </div>
+    
+    <script>
+        document.getElementById('verifyBtn').addEventListener('click', async function() {
+            const resultsDiv = document.getElementById('verificationResults');
+            resultsDiv.innerHTML = '<p>Running verification...</p>';
+            
+            const filesToCheck = [
+                '/plugin-demo/mood-palette/index.html',
+                '/plugin-demo/mood-palette/js/mood-palette.js',
+                '/plugin-demo/mood-palette/images/icon.png',
+                '/qr/final/index_fixed.html'
+            ];
+            
+            let allPassed = true;
+            let results = '<h3>Verification Results:</h3><ul>';
+            
+            // Check if server is running
+            try {
+                const response = await fetch('http://localhost:8000');
+                if (response.ok) {
+                    results += '<li class="success">✓ Web server is running</li>';
+                } else {
+                    results += '<li class="error">✗ Web server is not responding</li>';
+                    allPassed = false;
+                }
+            } catch (error) {
+                results += '<li class="error">✗ Web server is not running</li>';
+                allPassed = false;
+            }
+            
+            // Check each file
+            for (const file of filesToCheck) {
+                try {
+                    const response = await fetch(`http://localhost:8000${file}`, { method: 'HEAD' });
+                    if (response.ok) {
+                        results += `<li class="success">✓ ${file} is accessible</li>`;
+                    } else {
+                        results += `<li class="error">✗ ${file} is not accessible</li>`;
+                        allPassed = false;
+                    }
+                } catch (error) {
+                    results += `<li class="error">✗ ${file} is not accessible</li>`;
+                    allPassed = false;
+                }
+            }
+            
+            results += '</ul>';
+            
+            if (allPassed) {
+                results += '<p class="success"><strong>All tests passed! The Mood Palette Generator should work correctly.</strong></p>';
+            } else {
+                results += '<p class="error"><strong>Some tests failed. Please check the issues above.</strong></p>';
+            }
+            
+            resultsDiv.innerHTML = results;
+        });
+    </script>
+</body>
+</html>

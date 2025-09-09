@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Mood Palette Icon</title>
+</head>
+<body>
+    <h1>Generate Mood Palette Icon</h1>
+    <p>Click the button below to generate and download the icon:</p>
+    <button id="generateBtn">Generate Icon</button>
+    <div id="icon-container"></div>
+    
+    <script src="./js/create-icon.js"></script>
+    <script>
+        document.getElementById('generateBtn').addEventListener('click', function() {
+            const iconData = createPaletteIcon();
+            const link = document.createElement('a');
+            link.download = 'icon.png';
+            link.href = iconData;
+            link.click();
+            
+            // Show preview
+            const img = document.createElement('img');
+            img.src = iconData;
+            img.style.width = '64px';
+            img.style.height = '64px';
+            img.style.marginTop = '20px';
+            document.getElementById('icon-container').appendChild(img);
+        });
+    </script>
+</body>
+</html>
