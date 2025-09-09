@@ -193,16 +193,13 @@ function captureImageFromPTT() {
 // Function to upload image to catbox.moe
 async function uploadToCatbox(imageData) {
     try {
-        showStatus('UPLOADING IMAGE...', 'info');
+        showStatus('UPLOADING TO CATBOX...', 'info');
         console.log('Starting image upload to catbox');
         
         // Validate image data
         if (!imageData) {
             throw new Error('No image data provided');
         }
-        
-        // Log the image data info for debugging
-        console.log('Image data length:', imageData.length);
         
         // Convert data URL to Blob
         const blob = dataURLToBlob(imageData);
@@ -213,24 +210,28 @@ async function uploadToCatbox(imageData) {
         formData.append('reqtype', 'fileupload');
         formData.append('fileToUpload', blob, 'image.jpg');
         
-        // Try to upload to catbox with a simpler approach
+        // Try to upload to catbox
         console.log('Sending request to catbox.moe');
         const response = await fetch('https://catbox.moe/user/api.php', {
             method: 'POST',
-            body: formData,
-            // Remove signal to avoid AbortError
+            body: formData
         });
         
         console.log('Catbox response status:', response.status);
         
         if (response.ok) {
-            const url = await response.text();
+            const responseText = await response.text();
+            const url = responseText.trim();
             console.log('Image uploaded successfully to:', url);
-            showStatus('IMAGE UPLOADED SUCCESSFULLY', 'info');
-            return url.trim(); // Trim any whitespace
+            
+            // Validate that we got a URL
+            if (url && url.length > 0) {
+                showStatus('IMAGE UPLOADED SUCCESSFULLY', 'success');
+                return url;
+            } else {
+                throw new Error('Empty response from catbox');
+            }
         } else {
-            const errorText = await response.text();
-            console.error('Catbox upload failed with status:', response.status, 'Response:', errorText);
             throw new Error('Upload failed with status: ' + response.status);
         }
     } catch (error) {
@@ -270,22 +271,12 @@ function analyzeColorsFromImage() {
         return;
     }
     
-    showStatus('ANALYZING IMAGE COLORS...', 'info');
+    showStatus('UPLOADING IMAGE FOR ANALYSIS...', 'info');
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
-        // Try sending the image data directly to the LLM
-        // The LLM might be able to handle base64 image data
-        showStatus('SENDING IMAGE TO LLM...', 'info');
-        
-        const payload = {
-            message: "Analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {'colors': ['#hex1', '#hex2', '#hex3', '#hex4', '#hex5']}",
-            useLLM: true,
-            imageData: capturedImageData // Send the actual image data
-        };
-        
-        console.log('Sending image data to LLM, data length:', capturedImageData.length);
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
+        // Immediately use catbox to upload the image and get a URL
+        fallbackToCatboxAnalysis();
     } else {
         // Simulate analysis for browser testing with more realistic colors
         setTimeout(() => {
@@ -380,9 +371,11 @@ function displayPalette(colors) {
 }
 
 function emailPalette() {
-    console.log('Email palette function called, currentPalette:', currentPalette);
+    console.log('Email palette function called');
+    console.log('Current palette:', currentPalette);
     
-    if (!currentPalette || currentPalette.length === 0) {
+    // Check if we have a valid palette
+    if (!currentPalette || !Array.isArray(currentPalette) || currentPalette.length === 0) {
         showStatus('NO PALETTE TO SEND', 'error');
         return;
     }
@@ -454,40 +447,21 @@ window.onPluginMessage = function(data) {
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
             } else {
-                // If we can't parse colors, check if it's a request for image URL
-                handleLLMResponse(data.data);
+                // Show the response as-is if it's not color data
+                showStatus(data.data, 'info');
             }
         } catch (e) {
             console.error('Error parsing plugin message:', e);
-            // Handle non-JSON responses
-            handleLLMResponse(data.data);
+            // Show the response as-is if we can't parse it
+            showStatus(data.data, 'info');
         }
     } else if (data.message) {
-        handleLLMResponse(data.message);
+        showStatus(data.message, 'info');
     } else {
         // Show raw data if no message or data
         showStatus('RECEIVED: ' + JSON.stringify(data), 'info');
     }
 };
-
-// Function to handle LLM responses
-function handleLLMResponse(response) {
-    console.log('Handling LLM response:', response);
-    
-    // Check if the response is asking for an image URL
-    if (typeof response === 'string' && 
-        (response.includes('upload') || 
-         response.includes('image URL') || 
-         response.includes('direct link') ||
-         response.includes('access the image') ||
-         response.includes('provide a link'))) {
-        showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
-        fallbackToCatboxAnalysis();
-    } else {
-        // Show the response as-is
-        showStatus(response, 'info');
-    }
-}
 
 // Helper functions
 function showStatus(message, type) {
@@ -503,28 +477,29 @@ function isValidEmail(email) {
 
 // Fallback function to use catbox for image hosting and analysis
 async function fallbackToCatboxAnalysis() {
-    showStatus('UPLOADING IMAGE FOR ANALYSIS...', 'info');
+    showStatus('UPLOADING IMAGE TO CATBOX...', 'info');
     
     try {
         // Upload image to catbox
         const imageUrl = await uploadToCatbox(capturedImageData);
         
-        if (imageUrl) {
-            showStatus('ANALYZING COLORS...', 'info');
-            console.log('Sending image URL to LLM:', imageUrl);
+        if (imageUrl && imageUrl.length > 0) {
+            showStatus('IMAGE UPLOADED! ANALYZING COLORS...', 'info');
+            console.log('Image uploaded to:', imageUrl);
             
-            // Send image URL to LLM for analysis with a more specific prompt
+            // Send image URL to LLM for analysis
             const payload = {
-                message: `Analyze the colors in this image: ${imageUrl} and provide exactly 5 dominant colors in hex format. Response format must be valid JSON: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}`,
+                message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Image URL: ${imageUrl}`,
                 useLLM: true
             };
             
+            console.log('Sending to LLM:', payload.message);
             PluginMessageHandler.postMessage(JSON.stringify(payload));
         } else {
-            throw new Error('Failed to upload image');
+            throw new Error('Failed to get image URL from catbox');
         }
     } catch (error) {
-        console.error('Fallback analysis error:', error);
+        console.error('Catbox analysis error:', error);
         showStatus('ANALYSIS FAILED: ' + error.message, 'error');
     }
 }
