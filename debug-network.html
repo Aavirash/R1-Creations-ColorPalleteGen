@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
+    <title>Network Debug</title>
+    <style>
+        body {
+            width: 240px;
+            height: 282px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+            border: 3px solid #ff0;
+            padding: 10px;
+        }
+        
+        .debug-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .status-box {
+            border: 2px solid #0f0;
+            padding: 10px;
+            margin-bottom: 10px;
+            min-height: 60px;
+            background: #111;
+        }
+        
+        .action-button {
+            padding: 10px;
+            background: #f00;
+            color: #fff;
+            border: 3px solid #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .action-button:hover {
+            background: #ff0;
+            color: #000;
+        }
+        
+        .log-area {
+            flex: 1;
+            border: 2px solid #0f0;
+            padding: 5px;
+            overflow-y: auto;
+            background: #111;
+            font-size: 10px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h2>Network Debug</h2>
+        
+        <div class="status-box" id="status">
+            Ready to test
+        </div>
+        
+        <button class="action-button" id="testNetwork">Test Network</button>
+        <button class="action-button" id="testCatbox">Test Catbox Upload</button>
+        
+        <div class="log-area" id="log">
+            Logs will appear here...
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+        
+        function log(message) {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            logEl.textContent += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            statusEl.textContent = message;
+            statusEl.style.borderColor = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#ff0';
+            statusEl.style.color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#ff0';
+        }
+        
+        async function testNetworkConnectivity() {
+            log('Testing network connectivity...');
+            updateStatus('Testing network...', 'info');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch('https://httpbin.org/get', {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                log(`Network test response: ${response.status}`);
+                updateStatus('Network connected!', 'success');
+                return true;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                log(`Network test failed: ${error.message}`);
+                updateStatus(`Network error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function testCatboxUpload() {
+            log('Testing catbox upload...');
+            updateStatus('Creating test image...', 'info');
+            
+            try {
+                // Create a simple test image
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw a simple pattern
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, 0, 50, 50);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(50, 0, 50, 50);
+                ctx.fillStyle = '#0000ff';
+                ctx.fillRect(0, 50, 50, 50);
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(50, 50, 50, 50);
+                
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                log(`Test image created, size: ${imageData.length} bytes`);
+                
+                // Convert to blob
+                updateStatus('Converting to blob...', 'info');
+                const blob = await new Promise((resolve, reject) => {
+                    try {
+                        const parts = imageData.split(';base64,');
+                        if (parts.length !== 2) {
+                            throw new Error('Invalid data URL format');
+                        }
+                        
+                        const contentType = parts[0].split(':')[1];
+                        const raw = atob(parts[1]);
+                        const rawLength = raw.length;
+                        const uInt8Array = new Uint8Array(rawLength);
+                        
+                        for (let i = 0; i < rawLength; ++i) {
+                            uInt8Array[i] = raw.charCodeAt(i);
+                        }
+                        
+                        const blob = new Blob([uInt8Array], { type: contentType || 'image/jpeg' });
+                        log(`Blob created, size: ${blob.size} bytes`);
+                        resolve(blob);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                
+                // Upload to catbox
+                updateStatus('Uploading to catbox...', 'info');
+                log('Sending request to catbox.moe');
+                
+                const formData = new FormData();
+                formData.append('reqtype', 'fileupload');
+                formData.append('fileToUpload', blob, 'test-image.jpg');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                
+                const response = await fetch('https://catbox.moe/user/api.php', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                log(`Catbox response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const responseText = await response.text();
+                    const url = responseText.trim();
+                    log(`Image uploaded successfully to: ${url}`);
+                    
+                    if (url && url.length > 0 && url.startsWith('http')) {
+                        updateStatus('Catbox upload successful!', 'success');
+                        log('Test completed successfully');
+                    } else {
+                        throw new Error('Invalid URL received from catbox');
+                    }
+                } else {
+                    throw new Error(`Upload failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                log(`Catbox test failed: ${error.message}`);
+                updateStatus(`Upload failed: ${error.message}`, 'error');
+            }
+        }
+        
+        document.getElementById('testNetwork').addEventListener('click', testNetworkConnectivity);
+        document.getElementById('testCatbox').addEventListener('click', testCatboxUpload);
+    </script>
+</body>
+</html>

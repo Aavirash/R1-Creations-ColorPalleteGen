@@ -150,21 +150,35 @@ async function testNetworkConnectivity() {
     showStatus('TESTING NETWORK...', 'info');
     
     try {
-        // Try a simple fetch to test connectivity
+        // Try a simple fetch to test connectivity with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
         const response = await fetch('https://httpbin.org/get', { 
             method: 'GET',
-            mode: 'no-cors' // Use no-cors to avoid CORS issues
+            mode: 'no-cors', // Use no-cors to avoid CORS issues
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         console.log('Network test response:', response.status);
-        showStatus('NETWORK OK', 'info');
+        showStatus('NETWORK CONNECTED', 'info');
+        return true;
     } catch (error) {
         console.error('Network test failed:', error);
-        showStatus('NETWORK ISSUE: ' + error.message, 'error');
+        if (error.name === 'AbortError') {
+            showStatus('NETWORK TEST TIMED OUT', 'error');
+        } else {
+            showStatus('NETWORK ISSUE: ' + error.message, 'error');
+        }
+        return false;
     }
 }
 
 function captureImageFromPTT() {
     if (!videoElement) return;
+    
+    showStatus('CAPTURING IMAGE...', 'info');
     
     // Create canvas to capture image
     const canvas = document.createElement('canvas');
@@ -177,6 +191,16 @@ function captureImageFromPTT() {
     
     // Store the image data
     capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Log image data info for debugging
+    console.log('Captured image data URL length:', capturedImageData.length);
+    console.log('Captured image starts with:', capturedImageData.substring(0, 100));
+    
+    // Validate captured image
+    if (!capturedImageData || capturedImageData.length < 100) {
+        showStatus('IMAGE CAPTURE FAILED - RETRY', 'error');
+        return;
+    }
     
     // Stop camera
     if (videoStream) {
@@ -205,17 +229,28 @@ async function uploadToCatbox(imageData) {
         const blob = dataURLToBlob(imageData);
         console.log('Blob created, size:', blob.size, 'type:', blob.type);
         
+        // Check if blob is valid
+        if (blob.size === 0) {
+            throw new Error('Image blob is empty');
+        }
+        
         // Create FormData
         const formData = new FormData();
         formData.append('reqtype', 'fileupload');
         formData.append('fileToUpload', blob, 'image.jpg');
         
-        // Try to upload to catbox
+        // Try to upload to catbox with timeout
         console.log('Sending request to catbox.moe');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
         const response = await fetch('https://catbox.moe/user/api.php', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('Catbox response status:', response.status);
         
@@ -225,18 +260,22 @@ async function uploadToCatbox(imageData) {
             console.log('Image uploaded successfully to:', url);
             
             // Validate that we got a URL
-            if (url && url.length > 0) {
+            if (url && url.length > 0 && url.startsWith('http')) {
                 showStatus('IMAGE UPLOADED SUCCESSFULLY', 'success');
                 return url;
             } else {
-                throw new Error('Empty response from catbox');
+                throw new Error('Invalid URL received from catbox: ' + responseText);
             }
         } else {
-            throw new Error('Upload failed with status: ' + response.status);
+            throw new Error('Upload failed with status: ' + response.status + ' ' + response.statusText);
         }
     } catch (error) {
         console.error('Catbox upload error:', error);
-        showStatus('UPLOAD FAILED: ' + error.message, 'error');
+        if (error.name === 'AbortError') {
+            showStatus('UPLOAD TIMED OUT - CHECK NETWORK', 'error');
+        } else {
+            showStatus('UPLOAD FAILED: ' + error.message, 'error');
+        }
         throw error;
     }
 }
@@ -244,6 +283,11 @@ async function uploadToCatbox(imageData) {
 // Helper function to convert data URL to Blob
 function dataURLToBlob(dataURL) {
     try {
+        // Check if dataURL is valid
+        if (!dataURL || !dataURL.startsWith('data:')) {
+            throw new Error('Invalid data URL');
+        }
+        
         const parts = dataURL.split(';base64,');
         if (parts.length !== 2) {
             throw new Error('Invalid data URL format');
@@ -258,7 +302,9 @@ function dataURLToBlob(dataURL) {
             uInt8Array[i] = raw.charCodeAt(i);
         }
         
-        return new Blob([uInt8Array], { type: contentType || 'image/jpeg' });
+        const blob = new Blob([uInt8Array], { type: contentType || 'image/jpeg' });
+        console.log('Blob created successfully:', blob.size, 'bytes,', blob.type);
+        return blob;
     } catch (error) {
         console.error('Error converting data URL to Blob:', error);
         throw error;
@@ -271,7 +317,7 @@ function analyzeColorsFromImage() {
         return;
     }
     
-    showStatus('UPLOADING IMAGE FOR ANALYSIS...', 'info');
+    showStatus('PREPARING IMAGE FOR ANALYSIS...', 'info');
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
@@ -279,6 +325,7 @@ function analyzeColorsFromImage() {
         fallbackToCatboxAnalysis();
     } else {
         // Simulate analysis for browser testing with more realistic colors
+        showStatus('ANALYZING COLORS...', 'info');
         setTimeout(() => {
             // Generate colors based on actual image analysis simulation
             currentPalette = generateRealisticPalette();
@@ -433,6 +480,7 @@ function resetApp() {
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
+    showStatus('PROCESSING RESPONSE...', 'info');
     
     if (data.data) {
         try {
@@ -463,6 +511,8 @@ window.onPluginMessage = function(data) {
             setTimeout(() => {
                 resetApp();
             }, 2000);
+        } else if (data.message.includes('timeout') || data.message.includes('failed') || data.message.includes('error')) {
+            showStatus('LLM ERROR: ' + data.message, 'error');
         } else {
             showStatus(data.message, 'info');
         }
@@ -489,12 +539,29 @@ async function fallbackToCatboxAnalysis() {
     showStatus('UPLOADING IMAGE TO CATBOX...', 'info');
     
     try {
+        // Check if we have image data
+        if (!capturedImageData) {
+            throw new Error('No captured image data available');
+        }
+        
+        console.log('Captured image data length:', capturedImageData.length);
+        
+        // Validate image data
+        if (capturedImageData.length < 100) {
+            throw new Error('Captured image data is too small');
+        }
+        
         // Upload image to catbox
         const imageUrl = await uploadToCatbox(capturedImageData);
         
         if (imageUrl && imageUrl.length > 0) {
-            showStatus('IMAGE UPLOADED! ANALYZING COLORS...', 'info');
+            showStatus('IMAGE UPLOADED! REQUESTING ANALYSIS...', 'info');
             console.log('Image uploaded to:', imageUrl);
+            
+            // Validate URL before sending to LLM
+            if (!imageUrl.startsWith('http')) {
+                throw new Error('Invalid image URL received');
+            }
             
             // Send image URL to LLM for analysis
             const payload = {
@@ -504,6 +571,7 @@ async function fallbackToCatboxAnalysis() {
             };
             
             console.log('Sending to LLM:', payload.message);
+            showStatus('REQUESTING COLOR ANALYSIS...', 'info');
             PluginMessageHandler.postMessage(JSON.stringify(payload));
         } else {
             throw new Error('Failed to get image URL from catbox');
