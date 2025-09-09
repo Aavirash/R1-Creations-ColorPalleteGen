@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
+    <title>Mood Palette Debug</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .debug-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 1000;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+        }
+        
+        .debug-panel h3 {
+            color: #ff0;
+            margin: 0 0 10px 0;
+        }
+        
+        .debug-log {
+            height: 200px;
+            overflow-y: auto;
+            background: #222;
+            border: 1px solid #666;
+            padding: 5px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        
+        .debug-button {
+            display: block;
+            width: 100%;
+            padding: 5px;
+            margin: 5px 0;
+            background: #f00;
+            color: #fff;
+            border: 1px solid #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        .debug-button:hover {
+            background: #ff0;
+            color: #000;
+        }
+        
+        .toggle-debug {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            background: #f00;
+            color: #fff;
+            border: 1px solid #0f0;
+            padding: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Color Palette</h1>
+        </header>
+
+        <main id="content">
+            <div class="mood-palette-container">
+                <!-- Content will be dynamically replaced -->
+                <div id="appContent">
+                    <!-- Initial screen content will be loaded here -->
+                </div>
+                
+                <div class="status-message" id="statusMessage"></div>
+            </div>
+        </main>
+    </div>
+    
+    <button class="toggle-debug" onclick="toggleDebug()">DEBUG</button>
+    
+    <div class="debug-panel" id="debugPanel" style="display: none;">
+        <h3>DEBUG PANEL</h3>
+        <div class="debug-log" id="debugLog"></div>
+        <button class="debug-button" onclick="testNetwork()">Test Network</button>
+        <button class="debug-button" onclick="testCatbox()">Test Catbox</button>
+        <button class="debug-button" onclick="simulateCapture()">Simulate Capture</button>
+        <button class="debug-button" onclick="simulateAnalysis()">Simulate Analysis</button>
+        <button class="debug-button" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        // Debug functions
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function debugLog(message) {
+            const log = document.getElementById('debugLog');
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            log.textContent += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+            console.log(`[DEBUG] ${message}`);
+        }
+        
+        function testNetwork() {
+            debugLog('Testing network connectivity...');
+            fetch('https://httpbin.org/get', { method: 'GET', mode: 'no-cors' })
+                .then(response => {
+                    debugLog(`Network test response: ${response.status}`);
+                })
+                .catch(error => {
+                    debugLog(`Network test failed: ${error.message}`);
+                });
+        }
+        
+        function testCatbox() {
+            debugLog('Testing catbox upload...');
+            // This would require actual image data, so we'll just test the endpoint
+            fetch('https://catbox.moe/user/api.php', { method: 'OPTIONS' })
+                .then(response => {
+                    debugLog(`Catbox test response: ${response.status}`);
+                })
+                .catch(error => {
+                    debugLog(`Catbox test failed: ${error.message}`);
+                });
+        }
+        
+        function simulateCapture() {
+            debugLog('Simulating image capture...');
+            // Create a simple test image
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 150;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a colorful pattern
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(0, 0, 100, 75);
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(100, 0, 100, 75);
+            ctx.fillStyle = '#0000ff';
+            ctx.fillRect(0, 75, 100, 75);
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(100, 75, 100, 75);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            debugLog(`Test image created, size: ${imageData.length} bytes`);
+            
+            // Simulate setting the captured image data
+            window.capturedImageData = imageData;
+            debugLog('Image capture simulation complete');
+        }
+        
+        function simulateAnalysis() {
+            debugLog('Simulating color analysis...');
+            // Simulate receiving colors from LLM
+            const simulatedColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
+            window.currentPalette = simulatedColors;
+            
+            // Call the display function
+            if (typeof displayPalette === 'function') {
+                displayPalette(simulatedColors);
+                debugLog('Palette display updated');
+            }
+            
+            debugLog('Analysis simulation complete');
+        }
+        
+        function clearLog() {
+            document.getElementById('debugLog').textContent = '';
+        }
+        
+        // Make debug functions available globally
+        window.toggleDebug = toggleDebug;
+        window.testNetwork = testNetwork;
+        window.testCatbox = testCatbox;
+        window.simulateCapture = simulateCapture;
+        window.simulateAnalysis = simulateAnalysis;
+        window.clearLog = clearLog;
+        window.debugLog = debugLog;
+    </script>
+    
+    <script src="js/mood-palette.js"></script>
+</body>
+</html>

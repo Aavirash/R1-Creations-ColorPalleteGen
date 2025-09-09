@@ -3,6 +3,7 @@ let capturedImageData = null;
 let currentPalette = [];
 let videoStream = null;
 let videoElement = null;
+let isCapturing = false; // Track if we're in capture mode
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -17,7 +18,16 @@ function initializeApp() {
     
     // Register R1 PTT button listener
     window.addEventListener('sideClick', function() {
-        if (videoElement) {
+        if (videoElement && isCapturing) {
+            captureImageFromPTT();
+        }
+    });
+    
+    // Add keyboard support for spacebar capture
+    document.addEventListener('keydown', function(event) {
+        // Spacebar key
+        if (event.code === 'Space' && videoElement && isCapturing) {
+            event.preventDefault(); // Prevent spacebar from scrolling
             captureImageFromPTT();
         }
     });
@@ -109,6 +119,8 @@ function startCamera() {
     previewContainer.innerHTML = '<div class="placeholder-text">LOADING CAMERA...</div>';
     previewContainer.classList.remove('clickable');
     
+    isCapturing = true; // Set capture mode
+    
     // Test network connectivity
     testNetworkConnectivity();
     
@@ -129,18 +141,20 @@ function startCamera() {
                 previewContainer.innerHTML = '';
                 previewContainer.appendChild(videoElement);
                 
-                showStatus('CAMERA ON! PRESS R1 PTT TO CAPTURE', 'info');
+                showStatus('CAMERA ON! PRESS R1 PTT OR SPACEBAR', 'info');
             })
             .catch(function(error) {
                 console.error('Camera access error:', error);
                 showStatus('CAMERA ERROR', 'error');
                 previewContainer.innerHTML = '<div class="placeholder-text">CAMERA UNAVAILABLE</div>';
                 previewContainer.classList.add('clickable');
+                isCapturing = false;
             });
     } else {
         showStatus('CAMERA NOT SUPPORTED', 'error');
         previewContainer.innerHTML = '<div class="placeholder-text">NO CAMERA</div>';
         previewContainer.classList.add('clickable');
+        isCapturing = false;
     }
 }
 
@@ -208,6 +222,8 @@ function captureImageFromPTT() {
         videoStream = null;
         videoElement = null;
     }
+    
+    isCapturing = false; // Exit capture mode
     
     // Show screen 2
     showScreen2();
@@ -572,6 +588,22 @@ async function fallbackToCatboxAnalysis() {
             
             console.log('Sending to LLM:', payload.message);
             showStatus('REQUESTING COLOR ANALYSIS...', 'info');
+            
+            // Add a timeout for LLM response
+            const responseTimeout = setTimeout(() => {
+                showStatus('LLM RESPONSE TIMEOUT - TRYING AGAIN', 'error');
+            }, 30000); // 30 second timeout
+            
+            // Listen for the response
+            const originalOnPluginMessage = window.onPluginMessage;
+            window.onPluginMessage = function(data) {
+                clearTimeout(responseTimeout);
+                // Call the original handler
+                if (originalOnPluginMessage) {
+                    originalOnPluginMessage(data);
+                }
+            };
+            
             PluginMessageHandler.postMessage(JSON.stringify(payload));
         } else {
             throw new Error('Failed to get image URL from catbox');
