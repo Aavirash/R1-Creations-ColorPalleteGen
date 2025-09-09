@@ -1,7 +1,7 @@
 {
   "title": "Mood Palette Generator",
-  "url": "http://localhost:8000/plugin-demo/mood-palette/",
+  "url": "https://Aavirash.github.io/R1-Creations-ColorPalleteGen/",
   "description": "Capture images and generate AI-powered color palettes with the R1 device",
-  "iconUrl": "http://localhost:8000/plugin-demo/mood-palette/images/icon.png",
+  "iconUrl": "https://Aavirash.github.io/R1-Creations-ColorPalleteGen/images/icon.png",
   "themeColor": "#FE5000"
 }
