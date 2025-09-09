@@ -145,20 +145,22 @@ function startCamera() {
 }
 
 // Function to test network connectivity
-function testNetworkConnectivity() {
+async function testNetworkConnectivity() {
     console.log('Testing network connectivity...');
     showStatus('TESTING NETWORK...', 'info');
     
-    // Try to fetch a simple URL to test connectivity
-    fetch('https://httpbin.org/get', { mode: 'no-cors' })
-        .then(() => {
-            console.log('Network test successful');
-            showStatus('NETWORK OK', 'info');
-        })
-        .catch(error => {
-            console.error('Network test failed:', error);
-            showStatus('NETWORK ISSUE: ' + error.message, 'error');
+    try {
+        // Try a simple fetch to test connectivity
+        const response = await fetch('https://httpbin.org/get', { 
+            method: 'GET',
+            mode: 'no-cors' // Use no-cors to avoid CORS issues
         });
+        console.log('Network test response:', response.status);
+        showStatus('NETWORK OK', 'info');
+    } catch (error) {
+        console.error('Network test failed:', error);
+        showStatus('NETWORK ISSUE: ' + error.message, 'error');
+    }
 }
 
 function captureImageFromPTT() {
@@ -194,9 +196,13 @@ async function uploadToCatbox(imageData) {
         showStatus('UPLOADING IMAGE...', 'info');
         console.log('Starting image upload to catbox');
         
+        // Validate image data
+        if (!imageData) {
+            throw new Error('No image data provided');
+        }
+        
         // Log the image data info for debugging
-        console.log('Image data length:', imageData ? imageData.length : 'null');
-        console.log('Image data preview:', imageData ? imageData.substring(0, 100) : 'null');
+        console.log('Image data length:', imageData.length);
         
         // Convert data URL to Blob
         const blob = dataURLToBlob(imageData);
@@ -207,46 +213,30 @@ async function uploadToCatbox(imageData) {
         formData.append('reqtype', 'fileupload');
         formData.append('fileToUpload', blob, 'image.jpg');
         
-        // Log FormData contents
-        for (let pair of formData.entries()) {
-            console.log('FormData entry:', pair[0], pair[1]);
-        }
-        
-        // Upload to catbox with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
+        // Try to upload to catbox with a simpler approach
         console.log('Sending request to catbox.moe');
         const response = await fetch('https://catbox.moe/user/api.php', {
             method: 'POST',
             body: formData,
-            signal: controller.signal
+            // Remove signal to avoid AbortError
         });
         
-        clearTimeout(timeoutId);
-        
         console.log('Catbox response status:', response.status);
-        console.log('Catbox response headers:', [...response.headers.entries()]);
         
         if (response.ok) {
             const url = await response.text();
             console.log('Image uploaded successfully to:', url);
             showStatus('IMAGE UPLOADED SUCCESSFULLY', 'info');
-            return url;
+            return url.trim(); // Trim any whitespace
         } else {
             const errorText = await response.text();
             console.error('Catbox upload failed with status:', response.status, 'Response:', errorText);
-            throw new Error('Upload failed with status: ' + response.status + ', Response: ' + errorText);
+            throw new Error('Upload failed with status: ' + response.status);
         }
     } catch (error) {
         console.error('Catbox upload error:', error);
-        if (error.name === 'AbortError') {
-            showStatus('UPLOAD FAILED: Timeout', 'error');
-            throw new Error('Upload timed out');
-        } else {
-            showStatus('UPLOAD FAILED: ' + error.message, 'error');
-            throw error;
-        }
+        showStatus('UPLOAD FAILED: ' + error.message, 'error');
+        throw error;
     }
 }
 
@@ -330,41 +320,50 @@ function displayPalette(colors) {
     const paletteDisplay = document.getElementById('paletteDisplay');
     paletteDisplay.innerHTML = '';
     
-    if (colors && colors.length > 0) {
+    if (colors && Array.isArray(colors) && colors.length > 0) {
+        console.log('Displaying palette with colors:', colors);
+        
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-container';
+        paletteContainer.style.display = 'flex';
+        paletteContainer.style.gap = '10px';
+        paletteContainer.style.justifyContent = 'center';
+        paletteContainer.style.flexWrap = 'wrap';
+        paletteContainer.style.alignItems = 'center';
+        paletteContainer.style.marginTop = '10px';
         
         colors.forEach((color, index) => {
-            const swatchContainer = document.createElement('div');
-            swatchContainer.className = 'swatch-container';
-            swatchContainer.style.display = 'flex';
-            swatchContainer.style.flexDirection = 'column';
-            swatchContainer.style.alignItems = 'center';
-            swatchContainer.style.margin = '5px';
-            
-            // Create a rectangle shape for the color
-            const colorSwatch = document.createElement('div');
-            colorSwatch.className = 'color-swatch';
-            colorSwatch.style.backgroundColor = color;
-            colorSwatch.style.width = '40px';
-            colorSwatch.style.height = '40px';
-            colorSwatch.style.border = '2px solid #fff';
-            colorSwatch.style.borderRadius = '4px';
-            colorSwatch.title = color;
-            
-            // Add a label with the hex code
-            const colorLabel = document.createElement('div');
-            colorLabel.className = 'color-label';
-            colorLabel.textContent = color;
-            colorLabel.style.color = '#fff';
-            colorLabel.style.fontSize = '10px';
-            colorLabel.style.marginTop = '4px';
-            colorLabel.style.fontFamily = 'Courier New, monospace';
-            colorLabel.style.textAlign = 'center';
-            
-            swatchContainer.appendChild(colorSwatch);
-            swatchContainer.appendChild(colorLabel);
-            paletteContainer.appendChild(swatchContainer);
+            // Validate that color is a valid hex code
+            if (typeof color === 'string' && /^#[0-9A-F]{6}$/i.test(color)) {
+                const swatchContainer = document.createElement('div');
+                swatchContainer.style.display = 'flex';
+                swatchContainer.style.flexDirection = 'column';
+                swatchContainer.style.alignItems = 'center';
+                swatchContainer.style.margin = '5px';
+                
+                // Create a rectangle shape for the color
+                const colorSwatch = document.createElement('div');
+                colorSwatch.style.backgroundColor = color;
+                colorSwatch.style.width = '40px';
+                colorSwatch.style.height = '40px';
+                colorSwatch.style.border = '2px solid #fff';
+                colorSwatch.style.borderRadius = '4px';
+                colorSwatch.style.boxSizing = 'border-box';
+                colorSwatch.title = color;
+                
+                // Add a label with the hex code
+                const colorLabel = document.createElement('div');
+                colorLabel.textContent = color;
+                colorLabel.style.color = '#fff';
+                colorLabel.style.fontSize = '10px';
+                colorLabel.style.marginTop = '4px';
+                colorLabel.style.fontFamily = 'Courier New, monospace';
+                colorLabel.style.textAlign = 'center';
+                
+                swatchContainer.appendChild(colorSwatch);
+                swatchContainer.appendChild(colorLabel);
+                paletteContainer.appendChild(swatchContainer);
+            }
         });
         
         paletteDisplay.appendChild(paletteContainer);
@@ -372,10 +371,11 @@ function displayPalette(colors) {
         // Update currentPalette with the received colors
         currentPalette = colors;
         
-        console.log('Palette displayed with colors:', colors);
+        console.log('Palette displayed successfully');
     } else {
-        paletteDisplay.innerHTML = '<div class="placeholder-text">NO COLORS FOUND</div>';
+        paletteDisplay.innerHTML = '<div class="placeholder-text">NO VALID COLORS FOUND</div>';
         currentPalette = [];
+        console.log('No valid colors to display');
     }
 }
 
@@ -449,6 +449,7 @@ window.onPluginMessage = function(data) {
             
             // Handle color analysis response
             if (parsedData.colors && Array.isArray(parsedData.colors)) {
+                console.log('Received colors from LLM:', parsedData.colors);
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
@@ -478,7 +479,8 @@ function handleLLMResponse(response) {
         (response.includes('upload') || 
          response.includes('image URL') || 
          response.includes('direct link') ||
-         response.includes('access the image'))) {
+         response.includes('access the image') ||
+         response.includes('provide a link'))) {
         showStatus('LLM REQUESTED IMAGE URL, UPLOADING...', 'info');
         fallbackToCatboxAnalysis();
     } else {
