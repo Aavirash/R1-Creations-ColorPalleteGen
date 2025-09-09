@@ -2,23 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>R1 Creations SDK Demo</title>
+    <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
+    <title>R1 Creations Test App</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <button id="menuBtn" class="menu-btn">☰</button>
-            <h1>R1 Creations SDK</h1>
+            <h1>R1 Test</h1>
+            <button id="menuBtn" class="menu-button" aria-label="Menu">☰</button>
         </header>
 
         <nav id="menuNav" class="menu-nav">
-            <button id="closeMenu" class="close-menu">×</button>
+            <button class="close-menu" id="closeMenu">×</button>
             <ul>
-                <li><a href="#" class="active" data-page="welcome">Welcome</a></li>
                 <li><a href="#" data-page="hardware">Hardware</a></li>
-                <li><a href="#" data-page="data">Data & AI</a></li>
+                <li><a href="#" data-page="data">Data</a></li>
                 <li><a href="#" data-page="speak">Speak</a></li>
                 <li><a href="#" data-page="mood-palette">Mood Palette</a></li>
             </ul>
@@ -26,8 +25,8 @@
 
         <main id="content">
             <div class="welcome">
-                <h2>Welcome to R1 Creations SDK</h2>
-                <p>Select an option from the menu to explore different capabilities.</p>
+                <h2>Welcome</h2>
+                <p>Select an option from the menu to begin testing.</p>
             </div>
         </main>
     </div>
@@ -36,5 +35,6 @@
     <script src="js/hardware.js"></script>
     <script src="js/data.js"></script>
     <script src="js/speak.js"></script>
+    <script src="js/mood-palette.js"></script>
 </body>
 </html>

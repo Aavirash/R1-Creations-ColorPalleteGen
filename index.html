@@ -2,139 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mood Palette Generator</title>
-    <link rel="stylesheet" href="../css/styles.css">
-    <style>
-        .palette-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            padding: 10px;
-        }
-        
-        .camera-container {
-            width: 100%;
-            text-align: center;
-        }
-        
-        #videoElement {
-            width: 100%;
-            max-width: 200px;
-            height: auto;
-            border: 2px solid #333;
-            border-radius: 8px;
-        }
-        
-        .palette-display {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin: 15px 0;
-        }
-        
-        .color-swatch {
-            width: 40px;
-            height: 40px;
-            border-radius: 4px;
-            border: 1px solid #333;
-        }
-        
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 100%;
-        }
-        
-        button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            background-color: #4a4a4a;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        
-        .email-input {
-            display: flex;
-            gap: 5px;
-        }
-        
-        #emailInput {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #333;
-            border-radius: 4px;
-        }
-        
-        .status-message {
-            text-align: center;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-    </style>
+    <meta name="viewport" content="width=240, initial-scale=1.0, user-scalable=no">
+    <title>R1 Creations Test App</title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>Mood Palette Generator</h1>
+            <h1>R1 Test</h1>
+            <button id="menuBtn" class="menu-button" aria-label="Menu">☰</button>
         </header>
-        
-        <div class="palette-container">
-            <div class="camera-container">
-                <video id="videoElement" autoplay playsinline></video>
-                <canvas id="canvasElement" style="display: none;"></canvas>
+
+        <nav id="menuNav" class="menu-nav">
+            <button class="close-menu" id="closeMenu">×</button>
+            <ul>
+                <li><a href="#" data-page="hardware">Hardware</a></li>
+                <li><a href="#" data-page="data">Data</a></li>
+                <li><a href="#" data-page="speak">Speak</a></li>
+                <li><a href="#" data-page="mood-palette">Mood Palette</a></li>
+            </ul>
+        </nav>
+
+        <main id="content">
+            <div class="welcome">
+                <h2>Welcome</h2>
+                <p>Select an option from the menu to begin testing.</p>
             </div>
-            
-            <div class="controls">
-                <button id="captureBtn">Capture Image</button>
-                <button id="analyzeBtn" disabled>Analyze Colors</button>
-                <button id="generateBtn" disabled>Generate Palette</button>
-            </div>
-            
-            <div class="palette-display" id="paletteDisplay"></div>
-            
-            <div class="email-section">
-                <div class="email-input">
-                    <input type="email" id="emailInput" placeholder="Your email address">
-                    <button id="emailBtn" disabled>Email Palette</button>
-                </div>
-            </div>
-            
-            <div class="controls">
-                <button id="saveBtn" disabled>Save to Favorites</button>
-                <button id="viewFavoritesBtn">View Favorites</button>
-            </div>
-            
-            <div id="statusMessage"></div>
-        </div>
+        </main>
     </div>
 
-    <script src="./js/mood-palette.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/hardware.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/speak.js"></script>
+    <script src="js/mood-palette.js"></script>
 </body>
 </html>
