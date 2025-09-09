@@ -49,7 +49,7 @@ function showScreen2() {
     appContent.innerHTML = `
         <div class="screen-content">
             <div class="preview-section">
-                <div class="preview-container" style="height: 150px;">
+                <div class="preview-container" style="height: 120px;">
                     <div id="thumbnailContainer" class="thumbnail-container">
                         <div class="placeholder-text">IMG</div>
                     </div>
@@ -443,19 +443,19 @@ function generatePaletteImage() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Set canvas dimensions
-            canvas.width = 240; // Width of the R1 screen
-            canvas.height = 100; // Height for the palette
+            // Set canvas dimensions to fit R1 screen
+            canvas.width = 220; // Slightly smaller than 240px width to account for borders
+            canvas.height = 80; // Reduced height
             
             // Fill background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Draw each color swatch
-            const swatchWidth = 40;
-            const swatchHeight = 40;
-            const spacing = 10;
-            const startY = 20;
+            const swatchWidth = 30;
+            const swatchHeight = 30;
+            const spacing = 8;
+            const startY = 15;
             
             // Calculate starting X position to center the palette
             const totalWidth = (swatchWidth * currentPalette.length) + (spacing * (currentPalette.length - 1));
@@ -471,14 +471,14 @@ function generatePaletteImage() {
                 
                 // Draw border
                 ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1;
                 ctx.strokeRect(x, startY, swatchWidth, swatchHeight);
                 
                 // Draw color hex code below swatch
                 ctx.fillStyle = '#FFFFFF';
-                ctx.font = '10px Courier New';
+                ctx.font = '8px Courier New';
                 ctx.textAlign = 'center';
-                ctx.fillText(color, x + swatchWidth/2, startY + swatchHeight + 15);
+                ctx.fillText(color, x + swatchWidth/2, startY + swatchHeight + 12);
             });
             
             // Convert canvas to data URL
