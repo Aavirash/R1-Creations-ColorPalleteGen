@@ -8,7 +8,10 @@ echo "1. Preparing deployment package..."
 mkdir -p r1-mood-palette-deploy
 
 # Copy essential files
-cp -r plugin-demo/mood-palette/* r1-mood-palette-deploy/
+cp index.html r1-mood-palette-deploy/
+cp -r css r1-mood-palette-deploy/
+cp -r js r1-mood-palette-deploy/
+cp -r images r1-mood-palette-deploy/
 
 echo "✓ Deployment folder created"
 
