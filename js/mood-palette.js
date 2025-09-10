@@ -527,27 +527,6 @@ function resetApp() {
     showStatus('PRESS CAPTURE TO START CAMERA', 'info');
 }
 
-// Function to send extracted colors to LLM for processing
-function sendColorsToLLM(colors) {
-    showStatus('SENDING COLORS TO LLM...', 'info');
-    
-    try {
-        // Send color data to LLM for processing
-        const payload = {
-            message: `I've analyzed an image captured from the R1 device's camera and extracted these 5 dominant colors: ${colors.join(', ')}. Please provide a creative description of the mood or theme these colors represent, and suggest a name for this color palette. Return ONLY a JSON object in this exact format: {"paletteName": "name", "description": "description"}`,
-            useLLM: true,
-            wantsR1Response: false  // Set to false to get JSON response
-        };
-        
-        console.log('Sending colors to LLM with payload:', JSON.stringify(payload, null, 2));
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-        showStatus('COLORS SENT TO LLM. WAITING FOR RESPONSE...', 'info');
-    } catch (error) {
-        console.error('Error sending colors to LLM:', error);
-        showStatus('LLM COMMUNICATION FAILED', 'error');
-    }
-}
-
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
@@ -586,15 +565,6 @@ window.onPluginMessage = function(data) {
             setTimeout(() => {
                 resetApp();
             }, 2000);
-        } 
-        // Handle case where LLM requests image URL - but we're sending directly
-        else if (data.message.includes('image') && 
-                (data.message.includes('url') || 
-                 data.message.includes('link') || 
-                 data.message.includes('file') ||
-                 data.message.includes('upload'))) {
-            showStatus('LLM REQUESTED IMAGE URL - SENDING DIRECTLY', 'info');
-            console.log('LLM requested image URL but we are sending image data directly');
         } else if (data.message.includes('timeout') || data.message.includes('failed') || data.message.includes('error')) {
             showStatus('LLM ERROR: ' + data.message, 'error');
         } else {
@@ -701,27 +671,23 @@ function createColorShapes(colors) {
     return shapesContainer;
 }
 
-// Function to send image directly to LLM for analysis (deprecated - now using color extraction)
-function sendImageToLLM() {
-    showStatus('SENDING IMAGE TO LLM...', 'info');
+// Function to send extracted colors to LLM for processing
+function sendColorsToLLM(colors) {
+    showStatus('SENDING COLORS TO LLM...', 'info');
     
     try {
-        // Log the image data info for debugging
-        console.log('Sending image to LLM. Image data length:', capturedImageData ? capturedImageData.length : 'null');
-        
-        // Send image data directly to LLM for analysis with specific instructions
+        // Send color data to LLM for processing
         const payload = {
-            message: `I'm sending you an image captured from the R1 device's camera. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Do not request an image URL as I'm sending the image data directly.`,
+            message: `I've analyzed an image captured from the R1 device's camera and extracted these 5 dominant colors: ${colors.join(', ')}. Please provide a creative description of the mood or theme these colors represent, and suggest a name for this color palette. Return ONLY a JSON object in this exact format: {"paletteName": "name", "description": "description"}`,
             useLLM: true,
-            wantsR1Response: false,  // Set to false to get JSON response
-            imageData: capturedImageData  // Send image data directly
+            wantsR1Response: false  // Set to false to get JSON response
         };
         
-        console.log('Sending image to LLM with payload:', JSON.stringify(payload, null, 2));
+        console.log('Sending colors to LLM with payload:', JSON.stringify(payload, null, 2));
         PluginMessageHandler.postMessage(JSON.stringify(payload));
-        showStatus('IMAGE SENT TO LLM. WAITING FOR RESPONSE...', 'info');
+        showStatus('COLORS SENT TO LLM. WAITING FOR RESPONSE...', 'info');
     } catch (error) {
-        console.error('Error sending image to LLM:', error);
+        console.error('Error sending colors to LLM:', error);
         showStatus('LLM COMMUNICATION FAILED', 'error');
     }
 }
