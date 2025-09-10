@@ -41,10 +41,9 @@ function showScreen1() {
                 <div id="previewContainer" class="preview-container clickable">
                     <div class="placeholder-text">TAP TO START CAMERA</div>
                 </div>
-            </div>
-            
-            <div class="controls-section">
-                <button id="captureBtn" class="action-button">START CAMERA</button>
+                <div class="controls-section">
+                    <button id="captureBtn" class="action-button">START CAMERA</button>
+                </div>
             </div>
         </div>
     `;
