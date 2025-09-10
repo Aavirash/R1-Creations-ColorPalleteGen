@@ -58,7 +58,7 @@ function showScreen2() {
     appContent.innerHTML = `
         <div class="screen-content">
             <div class="preview-section">
-                <div class="preview-container" style="height: 120px;">
+                <div class="preview-container" style="height: 110px;">
                     <div id="thumbnailContainer" class="thumbnail-container">
                         <div class="placeholder-text">IMG</div>
                     </div>

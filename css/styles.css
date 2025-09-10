@@ -54,7 +54,7 @@ main {
     flex-direction: column;
     height: 100%;
     position: relative;
-    padding-top: 30px; /* Add space at top for status message */
+    padding-top: 35px; /* Add space at top for status message */
     padding-bottom: 5px; /* Reduced bottom padding */
 }
 
@@ -71,7 +71,7 @@ main {
 
 .preview-container {
     width: 100%;
-    height: 120px; /* Reduced height to make room for buttons */
+    height: 110px; /* Reduced height to make room for buttons and status */
     background: #222;
     border: 3px solid #0f0;
     display: flex;
@@ -250,7 +250,7 @@ main {
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 45px; /* Move to top instead of bottom */
+    top: 5px; /* Position at top to avoid overlapping with content */
     left: 5px;
     right: 5px;
     border: 2px solid;
