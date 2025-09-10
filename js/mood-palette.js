@@ -260,6 +260,13 @@ function dataURLToBlob(dataURL) {
     }
 }
 
+// Function to calculate color distance (Euclidean distance in RGB space)
+function colorDistance(rgb1, rgb2) {
+    const [r1, g1, b1] = rgb1;
+    const [r2, g2, b2] = rgb2;
+    return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
+}
+
 // Function to extract dominant colors from image data
 function extractColorsFromImage(imageData) {
     return new Promise((resolve) => {
@@ -271,11 +278,12 @@ function extractColorsFromImage(imageData) {
             const ctx = canvas.getContext('2d');
             
             // Set canvas size to match image (but smaller for performance)
-            const maxWidth = 100;
-            const maxHeight = 100;
+            // Use larger canvas for better color accuracy
+            const maxWidth = 300;
+            const maxHeight = 300;
             const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-            canvas.width = img.width * ratio;
-            canvas.height = img.height * ratio;
+            canvas.width = Math.max(100, img.width * ratio);
+            canvas.height = Math.max(100, img.height * ratio);
             
             // Draw image on canvas
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -284,45 +292,101 @@ function extractColorsFromImage(imageData) {
             const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageDataObj.data;
             
-            // Extract colors using simple sampling method
-            const colorMap = {};
-            const step = Math.max(1, Math.floor(canvas.width * canvas.height / 1000)); // Sample every nth pixel
+            // Collect all colors with better sampling
+            const colors = [];
+            // Sample more pixels but still maintain performance
+            const step = Math.max(1, Math.floor(canvas.width * canvas.height / 2500));
             
             for (let i = 0; i < data.length; i += step * 4) {
                 const r = data[i];
                 const g = data[i + 1];
                 const b = data[i + 2];
+                const a = data[i + 3];
                 
-                // Skip very dark or very light colors for better palette
+                // Skip transparent pixels
+                if (a < 128) continue;
+                
+                // Skip very dark or very light pixels for better palette
                 const brightness = (r + g + b) / 3;
-                if (brightness < 30 || brightness > 225) continue;
+                if (brightness < 15 || brightness > 240) continue;
                 
-                // Quantize colors to reduce palette size
-                const quantizedR = Math.round(r / 32) * 32;
-                const quantizedG = Math.round(g / 32) * 32;
-                const quantizedB = Math.round(b / 32) * 32;
-                
-                const colorKey = `${quantizedR},${quantizedG},${quantizedB}`;
-                colorMap[colorKey] = (colorMap[colorKey] || 0) + 1;
+                colors.push([r, g, b]);
             }
             
-            // Convert to array and sort by frequency
-            const colorArray = Object.entries(colorMap)
-                .map(([key, count]) => {
-                    const [r, g, b] = key.split(',').map(Number);
+            // If we don't have enough colors, use all pixels
+            if (colors.length < 50) {
+                for (let i = 0; i < data.length; i += 20 * 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const a = data[i + 3];
+                    
+                    // Skip transparent pixels
+                    if (a < 128) continue;
+                    
+                    colors.push([r, g, b]);
+                }
+            }
+            
+            // Simple clustering: group similar colors together
+            const clusters = [];
+            const threshold = 30; // Distance threshold for grouping colors
+            
+            colors.forEach(color => {
+                let foundCluster = false;
+                
+                // Try to find an existing cluster for this color
+                for (let i = 0; i < clusters.length; i++) {
+                    const cluster = clusters[i];
+                    // Calculate average color of the cluster
+                    const avgR = cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length;
+                    const avgG = cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length;
+                    const avgB = cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length;
+                    
+                    // If color is close enough to cluster average, add it to the cluster
+                    if (colorDistance(color, [avgR, avgG, avgB]) < threshold) {
+                        cluster.push(color);
+                        foundCluster = true;
+                        break;
+                    }
+                }
+                
+                // If no cluster found, create a new one
+                if (!foundCluster) {
+                    clusters.push([color]);
+                }
+            });
+            
+            // Convert clusters to dominant colors
+            const dominantColors = clusters
+                .map(cluster => {
+                    // Calculate average color of the cluster
+                    const avgR = Math.round(cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length);
+                    const avgG = Math.round(cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length);
+                    const avgB = Math.round(cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length);
+                    
                     return {
-                        color: rgbToHex(r, g, b),
-                        count: count
+                        color: rgbToHex(avgR, avgG, avgB),
+                        count: cluster.length,
+                        rgb: [avgR, avgG, avgB]
                     };
                 })
-                .sort((a, b) => b.count - a.count);
+                .sort((a, b) => b.count - a.count) // Sort by frequency
+                .slice(0, 5); // Get top 5 colors
             
-            // Get top 5 dominant colors
-            const topColors = colorArray.slice(0, 5).map(item => item.color);
+            // Extract just the color values
+            const topColors = dominantColors.map(item => item.color);
             
             // Fill up to 5 colors if needed
             while (topColors.length < 5) {
-                topColors.push('#808080'); // Default gray
+                // Use a color from existing colors or fallback
+                if (dominantColors.length > 0) {
+                    topColors.push(dominantColors[topColors.length % dominantColors.length].color);
+                } else {
+                    // Fallback colors
+                    const fallbackColors = ["#FF5733", "#33FF57", "#3357FF", "#F3FF33", "#FF33F3"];
+                    topColors.push(fallbackColors[topColors.length]);
+                }
             }
             
             resolve(topColors);
@@ -361,8 +425,9 @@ function analyzeColorsFromImage() {
         console.error('Color extraction failed:', error);
         showStatus('COLOR EXTRACTION FAILED', 'error');
         
-        // Fallback to simulated colors
-        const fallbackColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
+        // Fallback to simulated colors based on actual color extraction principles
+        // This will at least provide colors that look like they could come from an image
+        const fallbackColors = extractColorsFromImageFallback();
         currentPalette = fallbackColors;
         displayPalette(fallbackColors);
         
@@ -370,23 +435,89 @@ function analyzeColorsFromImage() {
     });
 }
 
+// More realistic fallback that generates colors based on common image patterns
+function extractColorsFromImageFallback() {
+    // Generate a palette with colors that look like they could come from a real image
+    // Using a deterministic approach based on current time to avoid pure randomness
+    const seed = Date.now() % 100000;
+    
+    // Generate a base color with natural hues
+    const baseHue = (seed * 137.508) % 360; // Use golden ratio for better distribution
+    const baseSat = 50 + (seed % 50);  // 50-100% saturation
+    const baseLight = 35 + (seed % 50); // 35-85% lightness
+    
+    // Generate related colors by varying hue, saturation, and lightness
+    const colors = [];
+    
+    // First color is the base color
+    const baseRgb = hslToRgb(baseHue / 360, baseSat / 100, baseLight / 100);
+    colors.push(rgbToHex(baseRgb[0], baseRgb[1], baseRgb[2]));
+    
+    // Generate complementary and analogous colors
+    for (let i = 1; i < 5; i++) {
+        let hueVariation, satVariation, lightVariation;
+        
+        // Create different types of color relationships
+        switch(i) {
+            case 1: // Complementary color
+                hueVariation = (baseHue + 180) % 360;
+                satVariation = Math.max(40, Math.min(100, baseSat + (seed % 20) - 10));
+                lightVariation = Math.max(30, Math.min(90, baseLight + (seed % 30) - 15));
+                break;
+            case 2: // Analogous color 1
+                hueVariation = (baseHue + 30 + (seed % 30)) % 360;
+                satVariation = Math.max(45, Math.min(95, baseSat + (seed % 15) - 7));
+                lightVariation = Math.max(35, Math.min(85, baseLight + (seed % 25) - 12));
+                break;
+            case 3: // Analogous color 2
+                hueVariation = (baseHue - 30 - (seed % 30) + 360) % 360;
+                satVariation = Math.max(45, Math.min(95, baseSat + (seed % 15) - 7));
+                lightVariation = Math.max(35, Math.min(85, baseLight + (seed % 25) - 12));
+                break;
+            case 4: // Triadic color
+                hueVariation = (baseHue + 120 + (seed % 60)) % 360;
+                satVariation = Math.max(50, Math.min(100, baseSat + (seed % 10) - 5));
+                lightVariation = Math.max(40, Math.min(90, baseLight + (seed % 20) - 10));
+                break;
+        }
+        
+        // Convert HSL to RGB
+        const rgb = hslToRgb(hueVariation / 360, satVariation / 100, lightVariation / 100);
+        colors.push(rgbToHex(rgb[0], rgb[1], rgb[2]));
+    }
+    
+    return colors;
+}
+
+// Helper function to convert HSL to RGB
+function hslToRgb(h, s, l) {
+    let r, g, b;
+    
+    if (s === 0) {
+        r = g = b = l; // achromatic
+    } else {
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+    
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
 function generatePalette() {
     // Transition to screen 3 where analysis happens
     showScreen3();
-}
-
-function generateRealisticPalette() {
-    // More realistic color palettes based on common image colors
-    const palettes = [
-        ["#8B4513", "#D2691E", "#CD853F", "#DEB887", "#F5DEB3"], // Browns/Tans
-        ["#006400", "#228B22", "#32CD32", "#90EE90", "#98FB98"], // Greens
-        ["#8B0000", "#DC143C", "#FF6347", "#FF7F50", "#FFA07A"], // Reds/Oranges
-        ["#00008B", "#0000CD", "#4169E1", "#87CEEB", "#B0E0E6"], // Blues
-        ["#4B0082", "#8A2BE2", "#9370DB", "#BA55D3", "#DA70D6"]  // Purples
-    ];
-    
-    // Return a random palette
-    return palettes[Math.floor(Math.random() * palettes.length)];
 }
 
 function displayPalette(colors) {
