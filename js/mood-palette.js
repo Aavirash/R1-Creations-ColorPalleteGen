@@ -260,34 +260,128 @@ function dataURLToBlob(dataURL) {
     }
 }
 
+// Function to extract dominant colors from image data
+function extractColorsFromImage(imageData) {
+    return new Promise((resolve) => {
+        // Create image element from data URL
+        const img = new Image();
+        img.onload = function() {
+            // Create canvas to analyze image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to match image (but smaller for performance)
+            const maxWidth = 100;
+            const maxHeight = 100;
+            const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            
+            // Draw image on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data
+            const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageDataObj.data;
+            
+            // Extract colors using simple sampling method
+            const colorMap = {};
+            const step = Math.max(1, Math.floor(canvas.width * canvas.height / 1000)); // Sample every nth pixel
+            
+            for (let i = 0; i < data.length; i += step * 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                // Skip very dark or very light colors for better palette
+                const brightness = (r + g + b) / 3;
+                if (brightness < 30 || brightness > 225) continue;
+                
+                // Quantize colors to reduce palette size
+                const quantizedR = Math.round(r / 32) * 32;
+                const quantizedG = Math.round(g / 32) * 32;
+                const quantizedB = Math.round(b / 32) * 32;
+                
+                const colorKey = `${quantizedR},${quantizedG},${quantizedB}`;
+                colorMap[colorKey] = (colorMap[colorKey] || 0) + 1;
+            }
+            
+            // Convert to array and sort by frequency
+            const colorArray = Object.entries(colorMap)
+                .map(([key, count]) => {
+                    const [r, g, b] = key.split(',').map(Number);
+                    return {
+                        color: rgbToHex(r, g, b),
+                        count: count
+                    };
+                })
+                .sort((a, b) => b.count - a.count);
+            
+            // Get top 5 dominant colors
+            const topColors = colorArray.slice(0, 5).map(item => item.color);
+            
+            // Fill up to 5 colors if needed
+            while (topColors.length < 5) {
+                topColors.push('#808080'); // Default gray
+            }
+            
+            resolve(topColors);
+        };
+        
+        img.src = imageData;
+    });
+}
+
+// Helper function to convert RGB to Hex
+function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+}
+
 function analyzeColorsFromImage() {
     if (!capturedImageData) {
         showStatus('NO IMAGE CAPTURED', 'error');
         return;
     }
     
-    showStatus('SENDING IMAGE TO LLM...', 'info');
+    showStatus('EXTRACTING COLORS...', 'info');
     console.log('Analyzing colors. PluginMessageHandler available:', typeof PluginMessageHandler !== 'undefined');
     
-    // In a real R1 implementation, we would send this to the LLM
-    if (typeof PluginMessageHandler !== 'undefined') {
-        console.log('Sending image directly to LLM');
-        // Send image data directly to LLM for analysis
-        sendImageToLLM();
-    } else {
-        console.log('Simulating analysis for browser testing');
-        // Simulate analysis for browser testing with more realistic colors
-        setTimeout(() => {
-            // Generate colors based on actual image analysis simulation
-            currentPalette = generateRealisticPalette();
-            displayPalette(currentPalette);
+    // Extract colors from image on device side
+    extractColorsFromImage(capturedImageData).then(colors => {
+        console.log('Extracted colors:', colors);
+        currentPalette = colors;
+        displayPalette(colors);
+        
+        // In a real R1 implementation, we would send this to the LLM
+        if (typeof PluginMessageHandler !== 'undefined') {
+            console.log('Sending color data to LLM');
+            sendColorsToLLM(colors);
+        } else {
+            console.log('Simulating analysis for browser testing');
             showStatus('PALETTE READY! EMAIL TO SEND', 'success');
-        }, 3000);
-    }
+        }
+    }).catch(error => {
+        console.error('Color extraction failed:', error);
+        showStatus('COLOR EXTRACTION FAILED', 'error');
+        
+        // Fallback to simulated colors
+        const fallbackColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"];
+        currentPalette = fallbackColors;
+        displayPalette(fallbackColors);
+        
+        if (typeof PluginMessageHandler !== 'undefined') {
+            sendColorsToLLM(fallbackColors);
+        } else {
+            showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+        }
+    });
 }
 
 function generatePalette() {
-    // This now just transitions to screen 3 where analysis happens
+    // Transition to screen 3 where analysis happens
     showScreen3();
 }
 
@@ -433,6 +527,27 @@ function resetApp() {
     showStatus('PRESS CAPTURE TO START CAMERA', 'info');
 }
 
+// Function to send extracted colors to LLM for processing
+function sendColorsToLLM(colors) {
+    showStatus('SENDING COLORS TO LLM...', 'info');
+    
+    try {
+        // Send color data to LLM for processing
+        const payload = {
+            message: `I've analyzed an image captured from the R1 device's camera and extracted these 5 dominant colors: ${colors.join(', ')}. Please provide a creative description of the mood or theme these colors represent, and suggest a name for this color palette. Return ONLY a JSON object in this exact format: {"paletteName": "name", "description": "description"}`,
+            useLLM: true,
+            wantsR1Response: false  // Set to false to get JSON response
+        };
+        
+        console.log('Sending colors to LLM with payload:', JSON.stringify(payload, null, 2));
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
+        showStatus('COLORS SENT TO LLM. WAITING FOR RESPONSE...', 'info');
+    } catch (error) {
+        console.error('Error sending colors to LLM:', error);
+        showStatus('LLM COMMUNICATION FAILED', 'error');
+    }
+}
+
 // Plugin message handler for LLM responses
 window.onPluginMessage = function(data) {
     console.log('Received plugin message:', data);
@@ -449,6 +564,11 @@ window.onPluginMessage = function(data) {
                 currentPalette = parsedData.colors;
                 displayPalette(currentPalette);
                 showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+            } 
+            // Handle palette name/description response
+            else if (parsedData.paletteName || parsedData.description) {
+                console.log('Received palette info from LLM:', parsedData);
+                showStatus('PALETTE ANALYZED! EMAIL TO SEND', 'success');
             } else {
                 // Show the response as-is if it's not color data
                 showStatus(data.data, 'info');
@@ -581,7 +701,7 @@ function createColorShapes(colors) {
     return shapesContainer;
 }
 
-// Function to send image directly to LLM for analysis
+// Function to send image directly to LLM for analysis (deprecated - now using color extraction)
 function sendImageToLLM() {
     showStatus('SENDING IMAGE TO LLM...', 'info');
     
