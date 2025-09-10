@@ -125,6 +125,104 @@ function showScreen3() {
     document.getElementById('emailBtn').addEventListener('click', emailPalette);
 }
 
+// Camera functionality - this was missing from the code
+function startCamera() {
+    console.log('=== STARTING CAMERA ===');
+    showStatus('INITIALIZING CAMERA...', 'info');
+    
+    // Get the preview container
+    const previewContainer = document.getElementById('previewContainer');
+    
+    // Create video element if it doesn't exist
+    if (!videoElement) {
+        videoElement = document.createElement('video');
+        videoElement.style.width = '100%';
+        videoElement.style.height = '100%';
+        videoElement.style.objectFit = 'cover';
+        videoElement.autoplay = true;
+        previewContainer.innerHTML = '';
+        previewContainer.appendChild(videoElement);
+    }
+    
+    // Access the camera
+    const constraints = {
+        video: {
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            facingMode: 'environment'
+        },
+        audio: false
+    };
+    
+    navigator.mediaDevices.getUserMedia(constraints)
+        .then(function(stream) {
+            videoStream = stream;
+            videoElement.srcObject = stream;
+            isCapturing = true;
+            
+            // Update UI
+            previewContainer.classList.remove('clickable');
+            showStatus('CAMERA READY - PRESS PTT OR SPACEBAR TO CAPTURE', 'success');
+            
+            // Update button text if it exists
+            const captureBtn = document.getElementById('captureBtn');
+            if (captureBtn) {
+                captureBtn.textContent = 'CAPTURE IMAGE';
+                captureBtn.onclick = captureImageFromPTT;
+            }
+        })
+        .catch(function(error) {
+            console.error('Camera error:', error);
+            showStatus('CAMERA ERROR: ' + error.message, 'error');
+            isCapturing = false;
+        });
+}
+
+function captureImageFromPTT() {
+    console.log('=== CAPTURING IMAGE ===');
+    if (!videoElement || !isCapturing) {
+        showStatus('CAMERA NOT READY', 'error');
+        return;
+    }
+    
+    showStatus('CAPTURING IMAGE...', 'info');
+    
+    try {
+        // Create canvas to capture the image
+        const canvas = document.createElement('canvas');
+        const video = videoElement;
+        
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the current video frame to the canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert to data URL
+        capturedImageData = canvas.toDataURL('image/png');
+        
+        console.log('Image captured. Data length:', capturedImageData.length);
+        
+        // Stop the camera stream
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+        
+        isCapturing = false;
+        
+        // Show screen 2 with thumbnail
+        showScreen2();
+        showStatus('IMAGE CAPTURED! GENERATE PALETTE', 'success');
+    } catch (error) {
+        console.error('Capture error:', error);
+        showStatus('CAPTURE FAILED: ' + error.message, 'error');
+    }
+}
+
 // Balanced color extraction function - 3 dominant, 2 secondary
 function extractBalancedColorsFromImage() {
     console.log('=== BALANCED COLOR EXTRACTION STARTED ===');

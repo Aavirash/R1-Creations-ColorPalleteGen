@@ -1,0 +1,297 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    width: 240px;
+    height: 282px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+    border: 3px solid #ff0;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+header {
+    background: #ff0;
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 40px;
+    border-bottom: 3px solid #0f0;
+}
+
+header h1 {
+    font-size: 18px;
+    font-weight: bold;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+main {
+    flex: 1;
+    padding: 10px;
+    background: #000;
+    position: relative;
+}
+
+.paint-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    padding-top: 35px;
+    padding-bottom: 5px;
+}
+
+.screen-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Canvas section */
+.canvas-section {
+    margin-bottom: 15px;
+    position: relative;
+    flex: 1;
+}
+
+.canvas-container {
+    width: 100%;
+    height: 140px;
+    background: #222;
+    border: 3px solid #0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+}
+
+#drawingCanvas {
+    background: #fff;
+    cursor: crosshair;
+}
+
+/* Tools section */
+.tools-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.tool-selector {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+}
+
+.tool-button {
+    padding: 8px;
+    background: #f00;
+    color: #fff;
+    border: 2px solid #0f0;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.tool-button:hover {
+    background: #ff0;
+    color: #000;
+    border-color: #f00;
+}
+
+.tool-button.active {
+    background: #0f0;
+    color: #000;
+    border-color: #f00;
+}
+
+.tool-button:disabled {
+    background: #333;
+    color: #666;
+    border-color: #666;
+    cursor: not-allowed;
+}
+
+/* Brush controls */
+.brush-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 5px;
+}
+
+.brush-size-display {
+    font-size: 10px;
+    color: #aaa;
+    min-width: 60px;
+    text-align: center;
+}
+
+.brush-size-value {
+    color: #ff0;
+    font-weight: bold;
+}
+
+/* Action buttons */
+.action-button {
+    padding: 10px;
+    background: #f00;
+    color: #fff;
+    border: 3px solid #0f0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.action-button:hover {
+    background: #ff0;
+    color: #000;
+    border-color: #f00;
+}
+
+.action-button:disabled {
+    background: #333;
+    color: #666;
+    border-color: #666;
+    cursor: not-allowed;
+}
+
+.action-button.secondary {
+    background: #0f0;
+    color: #000;
+    border-color: #f00;
+}
+
+.action-button.secondary:hover {
+    background: #f00;
+    color: #fff;
+    border-color: #0f0;
+}
+
+.action-button.email {
+    background: #00f;
+    border-color: #ff0;
+    padding: 8px;
+    font-size: 12px;
+}
+
+.action-button.email:hover {
+    background: #ff0;
+    color: #000;
+}
+
+/* Color palette */
+.color-palette {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin: 10px 0;
+    flex-wrap: wrap;
+}
+
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.color-swatch.active {
+    border-color: #ff0;
+    box-shadow: 0 0 5px #ff0;
+}
+
+/* Status message */
+.status-message {
+    padding: 5px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    text-align: center;
+    min-height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    border: 2px solid;
+    background: #000;
+    z-index: 100;
+}
+
+.status-message.success {
+    border-color: #0f0;
+    color: #0f0;
+}
+
+.status-message.error {
+    border-color: #f00;
+    color: #f00;
+}
+
+.status-message.info {
+    border-color: #ff0;
+    color: #ff0;
+}
+
+/* Modal dialogs */
+.modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 10px;
+}
+
+.modal h2 {
+    color: #ff0;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.modal-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
