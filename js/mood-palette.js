@@ -537,6 +537,14 @@ window.onPluginMessage = function(data) {
             const parsedData = JSON.parse(data.data);
             console.log('Parsed data:', parsedData);
             
+            // Handle email address response
+            if (parsedData.email) {
+                console.log('Received user email from LLM:', parsedData.email);
+                showStatus('EMAIL ADDRESS RECEIVED. SENDING PALETTE...', 'info');
+                sendPaletteToEmail(parsedData.email);
+                return;
+            }
+            
             // Handle color analysis response
             if (parsedData.colors && Array.isArray(parsedData.colors)) {
                 console.log('Received colors from LLM:', parsedData.colors);
@@ -690,4 +698,45 @@ function sendColorsToLLM(colors) {
         console.error('Error sending colors to LLM:', error);
         showStatus('LLM COMMUNICATION FAILED', 'error');
     }
+}
+
+// Function to send the palette image to a specific email address
+function sendPaletteToEmail(emailAddress) {
+    console.log('Sending palette to email:', emailAddress);
+    
+    // Generate the palette image
+    generatePaletteImage().then(imageDataUrl => {
+        showStatus('PALETTE IMAGE GENERATED. SENDING...', 'info');
+        
+        // In a real implementation, we would either:
+        // 1. Upload the image to a hosting service and send the URL
+        // 2. Send the image data directly if the email service supports it
+        // 3. Ask the LLM to generate an email with the image attached
+        
+        if (typeof PluginMessageHandler !== 'undefined') {
+            // Ask the LLM to send an email with the palette image
+            const payload = {
+                message: `Please send an email to ${emailAddress} with the attached color palette image. The palette colors are: ${currentPalette.join(', ')}. Include a creative description of the palette.`,
+                useLLM: true,
+                wantsR1Response: true,
+                imageData: imageDataUrl  // Send the image data directly
+            };
+            
+            PluginMessageHandler.postMessage(JSON.stringify(payload));
+            showStatus('SENDING EMAIL VIA LLM...', 'info');
+        } else {
+            // Simulate email sending in browser
+            setTimeout(() => {
+                showStatus('PALETTE SENT TO YOUR EMAIL!', 'success');
+                
+                // Reset after success
+                setTimeout(() => {
+                    resetApp();
+                }, 2000);
+            }, 1500);
+        }
+    }).catch(error => {
+        console.error('Error generating palette image:', error);
+        showStatus('FAILED TO GENERATE PALETTE IMAGE', 'error');
+    });
 }

@@ -54,7 +54,7 @@ main {
     flex-direction: column;
     height: 100%;
     position: relative;
-    padding-top: 35px; /* Add space at top for status message */
+    padding-top: 35px; /* Restore original padding */
     padding-bottom: 5px; /* Reduced bottom padding */
 }
 
@@ -250,7 +250,7 @@ main {
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 5px; /* Position at top to avoid overlapping with content */
+    top: 5px; /* Restore original position */
     left: 5px;
     right: 5px;
     border: 2px solid;
