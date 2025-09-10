@@ -355,14 +355,8 @@ function analyzeColorsFromImage() {
         currentPalette = colors;
         displayPalette(colors);
         
-        // In a real R1 implementation, we would send this to the LLM
-        if (typeof PluginMessageHandler !== 'undefined') {
-            console.log('Sending color data to LLM');
-            sendColorsToLLM(colors);
-        } else {
-            console.log('Simulating analysis for browser testing');
-            showStatus('PALETTE READY! EMAIL TO SEND', 'success');
-        }
+        // Just show success status
+        showStatus('PALETTE READY! EMAIL TO SEND', 'success');
     }).catch(error => {
         console.error('Color extraction failed:', error);
         showStatus('COLOR EXTRACTION FAILED', 'error');
@@ -372,11 +366,7 @@ function analyzeColorsFromImage() {
         currentPalette = fallbackColors;
         displayPalette(fallbackColors);
         
-        if (typeof PluginMessageHandler !== 'undefined') {
-            sendColorsToLLM(fallbackColors);
-        } else {
-            showStatus('PALETTE READY! EMAIL TO SEND', 'success');
-        }
+        showStatus('PALETTE READY! EMAIL TO SEND', 'success');
     });
 }
 
@@ -677,27 +667,6 @@ function createColorShapes(colors) {
     });
     
     return shapesContainer;
-}
-
-// Function to send extracted colors to LLM for processing
-function sendColorsToLLM(colors) {
-    showStatus('SENDING COLORS TO LLM...', 'info');
-    
-    try {
-        // Send color data to LLM for processing
-        const payload = {
-            message: `I've analyzed an image captured from the R1 device's camera and extracted these 5 dominant colors: ${colors.join(', ')}. Please provide a creative description of the mood or theme these colors represent, and suggest a name for this color palette. Return ONLY a JSON object in this exact format: {"paletteName": "name", "description": "description"}`,
-            useLLM: true,
-            wantsR1Response: false  // Set to false to get JSON response
-        };
-        
-        console.log('Sending colors to LLM with payload:', JSON.stringify(payload, null, 2));
-        PluginMessageHandler.postMessage(JSON.stringify(payload));
-        showStatus('COLORS SENT TO LLM. WAITING FOR RESPONSE...', 'info');
-    } catch (error) {
-        console.error('Error sending colors to LLM:', error);
-        showStatus('LLM COMMUNICATION FAILED', 'error');
-    }
 }
 
 // Function to send the palette image to a specific email address
