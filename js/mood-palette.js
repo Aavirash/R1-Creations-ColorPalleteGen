@@ -267,14 +267,14 @@ function analyzeColorsFromImage() {
         return;
     }
     
-    showStatus('UPLOADING IMAGE TO IMGUR...', 'info');
+    showStatus('SENDING IMAGE TO LLM...', 'info');
     console.log('Analyzing colors. PluginMessageHandler available:', typeof PluginMessageHandler !== 'undefined');
     
     // In a real R1 implementation, we would send this to the LLM
     if (typeof PluginMessageHandler !== 'undefined') {
-        console.log('Uploading image to imgur.com');
-        // Upload to imgur and then send URL to LLM
-        uploadToImgurAndAnalyze();
+        console.log('Sending image directly to LLM');
+        // Send image data directly to LLM for analysis
+        sendImageToLLM();
     } else {
         console.log('Simulating analysis for browser testing');
         // Simulate analysis for browser testing with more realistic colors
@@ -468,14 +468,14 @@ window.onPluginMessage = function(data) {
                 resetApp();
             }, 2000);
         } 
-        // Handle case where LLM requests image URL - but we're already using imgur
+        // Handle case where LLM requests image URL - but we're sending directly
         else if (data.message.includes('image') && 
                 (data.message.includes('url') || 
                  data.message.includes('link') || 
                  data.message.includes('file') ||
                  data.message.includes('upload'))) {
-            showStatus('LLM REQUESTED IMAGE URL - ALREADY USING IMGUR', 'info');
-            console.log('LLM requested image URL but we already sent imgur URL');
+            showStatus('LLM REQUESTED IMAGE URL - SENDING DIRECTLY', 'info');
+            console.log('LLM requested image URL but we are sending image data directly');
         } else if (data.message.includes('timeout') || data.message.includes('failed') || data.message.includes('error')) {
             showStatus('LLM ERROR: ' + data.message, 'error');
         } else {
@@ -582,89 +582,27 @@ function createColorShapes(colors) {
     return shapesContainer;
 }
 
-// Function to upload image to imgur and analyze
-async function uploadToImgurAndAnalyze() {
-    showStatus('UPLOADING IMAGE TO IMGUR...', 'info');
+// Function to send image directly to LLM for analysis
+function sendImageToLLM() {
+    showStatus('SENDING IMAGE TO LLM...', 'info');
     
     try {
-        // Check if we have image data
-        if (!capturedImageData) {
-            throw new Error('No captured image data available');
-        }
+        // Log the image data info for debugging
+        console.log('Sending image to LLM. Image data length:', capturedImageData ? capturedImageData.length : 'null');
         
-        console.log('Captured image data length:', capturedImageData.length);
+        // Send image data directly to LLM for analysis with specific instructions
+        const payload = {
+            message: `I'm sending you an image captured from the R1 device's camera. Please analyze this image and extract exactly 5 dominant colors in hex format. Return ONLY a JSON object in this exact format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Do not request an image URL as I'm sending the image data directly.`,
+            useLLM: true,
+            wantsR1Response: false,  // Set to false to get JSON response
+            imageData: capturedImageData  // Send image data directly
+        };
         
-        // Validate image data
-        if (capturedImageData.length < 100) {
-            throw new Error('Captured image data is too small');
-        }
-        
-        // Convert data URL to Blob
-        const blob = dataURLToBlob(capturedImageData);
-        console.log('Blob created, size:', blob.size, 'type:', blob.type);
-        
-        // Check if blob is valid
-        if (blob.size === 0) {
-            throw new Error('Image blob is empty');
-        }
-        
-        // Create FormData for imgur
-        const formData = new FormData();
-        formData.append('image', blob);
-        
-        // Try to upload to imgur with timeout
-        console.log('Sending request to imgur.com');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
-        const response = await fetch('https://api.imgur.com/3/image', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Authorization': 'Client-ID 546c223def8fc9a' // Anonymous client ID
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log('Imgur response status:', response.status);
-        
-        if (response.ok) {
-            const data = await response.json();
-            const imageUrl = data.data.link;
-            
-            console.log('Image uploaded successfully to:', imageUrl);
-            
-            // Validate that we got a URL
-            if (imageUrl && imageUrl.length > 0 && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-                showStatus('IMAGE UPLOADED TO IMGUR! REQUESTING ANALYSIS...', 'success');
-                
-                // Send image URL to LLM for analysis
-                const payload = {
-                    message: `Please analyze the colors in this image and provide exactly 5 dominant colors in hex format. Response format: {"colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"]}. Image URL: ${imageUrl}`,
-                    useLLM: true,
-                    wantsR1Response: false  // Set to false to get JSON response
-                };
-                
-                console.log('Sending to LLM:', payload.message);
-                showStatus('REQUESTING COLOR ANALYSIS...', 'info');
-                PluginMessageHandler.postMessage(JSON.stringify(payload));
-            } else {
-                throw new Error('Invalid URL received from imgur');
-            }
-        } else {
-            const errorData = await response.json();
-            throw new Error('Upload failed with status: ' + response.status + ' - ' + (errorData.data ? errorData.data.error : 'Unknown error'));
-        }
+        console.log('Sending image to LLM with payload:', JSON.stringify(payload, null, 2));
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
+        showStatus('IMAGE SENT TO LLM. WAITING FOR RESPONSE...', 'info');
     } catch (error) {
-        console.error('Imgur upload error:', error);
-        if (error.name === 'AbortError') {
-            showStatus('UPLOAD TIMED OUT - CHECK NETWORK', 'error');
-        } else if (error.message.includes('fetch')) {
-            showStatus('NETWORK ERROR - IMGUR UNAVAILABLE', 'error');
-        } else {
-            showStatus('UPLOAD FAILED: ' + error.message, 'error');
-        }
+        console.error('Error sending image to LLM:', error);
+        showStatus('LLM COMMUNICATION FAILED', 'error');
     }
 }
