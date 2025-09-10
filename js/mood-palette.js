@@ -118,8 +118,8 @@ function showScreen3() {
         return;
     }
     
-    // Start analyzing colors immediately
-    analyzeColorsFromImage();
+    // Start analyzing colors immediately - NO FALLBACKS
+    directColorExtraction();
     
     // Set up event listener
     document.getElementById('emailBtn').addEventListener('click', emailPalette);
@@ -132,8 +132,8 @@ function startCamera() {
     
     isCapturing = true; // Set capture mode
     
-    // Test network connectivity
-    testNetworkConnectivity();
+    // Remove network connectivity test - not needed for color extraction
+    // testNetworkConnectivity();
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
@@ -166,37 +166,6 @@ function startCamera() {
         previewContainer.innerHTML = '<div class="placeholder-text">NO CAMERA</div>';
         previewContainer.classList.add('clickable');
         isCapturing = false;
-    }
-}
-
-// Function to test network connectivity
-async function testNetworkConnectivity() {
-    console.log('Testing network connectivity...');
-    showStatus('TESTING NETWORK...', 'info');
-    
-    try {
-        // Try a simple fetch to test connectivity with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
-        const response = await fetch('https://httpbin.org/get', { 
-            method: 'GET',
-            mode: 'no-cors', // Use no-cors to avoid CORS issues
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        console.log('Network test response:', response.status);
-        showStatus('NETWORK CONNECTED', 'info');
-        return true;
-    } catch (error) {
-        console.error('Network test failed:', error);
-        if (error.name === 'AbortError') {
-            showStatus('NETWORK TEST TIMED OUT', 'error');
-        } else {
-            showStatus('NETWORK ISSUE: ' + error.message, 'error');
-        }
-        return false;
     }
 }
 
@@ -587,6 +556,122 @@ function generatePalette() {
     showScreen3();
 }
 
+// Simplified direct color extraction - NO FALLBACKS, NO ERROR COLORS
+function directColorExtraction() {
+    console.log('=== DIRECT COLOR EXTRACTION STARTED ===');
+    
+    if (!capturedImageData) {
+        console.log('ERROR: No captured image data!');
+        showStatus('NO IMAGE CAPTURED', 'error');
+        displayPalette(['#000000', '#000000', '#000000', '#000000', '#000000']);
+        return;
+    }
+    
+    console.log('Image data length:', capturedImageData.length);
+    console.log('Image data preview:', capturedImageData.substring(0, 100));
+    
+    showStatus('EXTRACTING COLORS...', 'info');
+    
+    try {
+        // Create image element from data URL
+        const img = new Image();
+        img.onload = function() {
+            try {
+                console.log('Image loaded. Dimensions:', img.width, 'x', img.height);
+                
+                // Create canvas to analyze image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size
+                canvas.width = 200;
+                canvas.height = 200;
+                
+                console.log('Canvas size set to:', canvas.width, 'x', canvas.height);
+                
+                // Draw image on canvas
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Get image data
+                const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageDataObj.data;
+                
+                console.log('Raw image data length:', data.length);
+                
+                // Simple color extraction - take samples from different parts of the image
+                const colors = [];
+                const step = Math.max(1, Math.floor(canvas.width * canvas.height / 1000));
+                
+                console.log('Sampling step:', step);
+                
+                // Sample pixels across the image
+                for (let i = 0; i < data.length; i += step * 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const a = data[i + 3];
+                    
+                    // Skip transparent pixels
+                    if (a < 128) continue;
+                    
+                    // Convert to hex
+                    const hex = '#' + [r, g, b].map(x => {
+                        const hex = x.toString(16);
+                        return hex.length === 1 ? '0' + hex : hex;
+                    }).join('');
+                    
+                    colors.push(hex);
+                    
+                    // Limit to 100 samples for performance
+                    if (colors.length >= 100) break;
+                }
+                
+                console.log('Sampled colors:', colors.length);
+                
+                // If we don't have enough colors, use what we have
+                if (colors.length === 0) {
+                    console.log('No colors found, using default');
+                    displayPalette(['#808080', '#808080', '#808080', '#808080', '#808080']);
+                    showStatus('NO COLORS FOUND', 'error');
+                    return;
+                }
+                
+                // Take first 5 colors as our palette
+                const palette = colors.slice(0, 5);
+                
+                // Fill up to 5 colors if needed
+                while (palette.length < 5) {
+                    palette.push(palette[palette.length % palette.length]);
+                }
+                
+                console.log('Final palette:', palette);
+                currentPalette = palette;
+                displayPalette(palette);
+                showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+                console.log('=== DIRECT COLOR EXTRACTION COMPLETED ===');
+            } catch (error) {
+                console.error('Error in image processing:', error);
+                showStatus('PROCESSING ERROR', 'error');
+                displayPalette(['#000000', '#000000', '#000000', '#000000', '#000000']);
+            }
+        };
+        
+        img.onerror = function() {
+            console.error('Failed to load image');
+            showStatus('IMAGE LOAD ERROR', 'error');
+            displayPalette(['#000000', '#000000', '#000000', '#000000', '#000000']);
+        };
+        
+        console.log('Setting image source...');
+        img.src = capturedImageData;
+    } catch (error) {
+        console.error('Error in directColorExtraction:', error);
+        showStatus('EXTRACTION ERROR', 'error');
+        displayPalette(['#000000', '#000000', '#000000', '#000000', '#000000']);
+    }
+}
+
+// Simplified display function - NO ERROR COLORS
 function displayPalette(colors) {
     console.log('=== DISPLAYING PALETTE ===');
     console.log('Colors to display:', colors);
@@ -600,13 +685,13 @@ function displayPalette(colors) {
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-container';
         paletteContainer.style.display = 'flex';
-        paletteContainer.style.gap = '8px';  // Reduced gap
+        paletteContainer.style.gap = '8px';
         paletteContainer.style.justifyContent = 'center';
         paletteContainer.style.flexWrap = 'wrap';
         paletteContainer.style.alignItems = 'center';
-        paletteContainer.style.marginTop = '5px';  // Reduced margin
-        paletteContainer.style.maxHeight = '100px';  // Limit height
-        paletteContainer.style.overflow = 'hidden';  // Prevent overflow
+        paletteContainer.style.marginTop = '5px';
+        paletteContainer.style.maxHeight = '100px';
+        paletteContainer.style.overflow = 'hidden';
         
         colors.forEach((color, index) => {
             // Validate that color is a valid hex code
@@ -615,24 +700,24 @@ function displayPalette(colors) {
                 swatchContainer.style.display = 'flex';
                 swatchContainer.style.flexDirection = 'column';
                 swatchContainer.style.alignItems = 'center';
-                swatchContainer.style.margin = '3px';  // Reduced margin
+                swatchContainer.style.margin = '3px';
                 
-                // Create a rectangle shape for the color (smaller size)
+                // Create a rectangle shape for the color
                 const colorSwatch = document.createElement('div');
                 colorSwatch.style.backgroundColor = color;
-                colorSwatch.style.width = '30px';  // Smaller width
-                colorSwatch.style.height = '30px';  // Smaller height
+                colorSwatch.style.width = '30px';
+                colorSwatch.style.height = '30px';
                 colorSwatch.style.border = '2px solid #fff';
                 colorSwatch.style.borderRadius = '4px';
                 colorSwatch.style.boxSizing = 'border-box';
                 colorSwatch.title = color;
                 
-                // Add a label with the hex code (smaller font)
+                // Add a label with the hex code
                 const colorLabel = document.createElement('div');
                 colorLabel.textContent = color;
                 colorLabel.style.color = '#fff';
-                colorLabel.style.fontSize = '8px';  // Smaller font
-                colorLabel.style.marginTop = '2px';  // Reduced margin
+                colorLabel.style.fontSize = '8px';
+                colorLabel.style.marginTop = '2px';
                 colorLabel.style.fontFamily = 'Courier New, monospace';
                 colorLabel.style.textAlign = 'center';
                 colorLabel.style.maxWidth = '30px';
@@ -654,10 +739,9 @@ function displayPalette(colors) {
         
         console.log('Palette displayed successfully');
     } else {
-        console.log('ERROR: No valid colors to display');
-        paletteDisplay.innerHTML = '<div class="placeholder-text">NO VALID COLORS FOUND</div>';
+        console.log('No colors to display, showing placeholder');
+        paletteDisplay.innerHTML = '<div class="placeholder-text">NO COLORS FOUND</div>';
         currentPalette = [];
-        console.log('No valid colors to display');
     }
     
     console.log('=== PALETTE DISPLAY COMPLETED ===');
