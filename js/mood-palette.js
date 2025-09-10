@@ -106,6 +106,18 @@ function showScreen3() {
         </div>
     `;
     
+    // Debug: Check if we have captured image data
+    console.log('=== SCREEN 3 DEBUG INFO ===');
+    console.log('Captured image data exists:', !!capturedImageData);
+    if (capturedImageData) {
+        console.log('Image data length:', capturedImageData.length);
+        console.log('Image data preview:', capturedImageData.substring(0, 100));
+    } else {
+        console.log('ERROR: NO CAPTURED IMAGE DATA!');
+        showStatus('ERROR: NO IMAGE CAPTURED', 'error');
+        return;
+    }
+    
     // Start analyzing colors immediately
     analyzeColorsFromImage();
     
@@ -189,7 +201,13 @@ async function testNetworkConnectivity() {
 }
 
 function captureImageFromPTT() {
-    if (!videoElement) return;
+    if (!videoElement) {
+        console.log('ERROR: No video element available for capture');
+        return;
+    }
+    
+    console.log('=== CAPTURE IMAGE STARTED ===');
+    console.log('Video element dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
     
     showStatus('CAPTURING IMAGE...', 'info');
     
@@ -199,25 +217,39 @@ function captureImageFromPTT() {
     canvas.height = videoElement.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     
+    console.log('Canvas created with dimensions:', canvas.width, 'x', canvas.height);
+    
     // Draw video frame to canvas
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
     
     // Store the image data
     capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
     
-    // Log image data info for debugging
-    console.log('Captured image data URL length:', capturedImageData.length);
-    console.log('Captured image starts with:', capturedImageData.substring(0, 100));
+    // Debug information
+    console.log('Image captured:');
+    console.log('Canvas size:', canvas.width, 'x', canvas.height);
+    console.log('Image data URL length:', capturedImageData.length);
+    console.log('Image data preview:', capturedImageData.substring(0, 100));
     
     // Validate captured image
     if (!capturedImageData || capturedImageData.length < 100) {
+        console.log('ERROR: Image capture failed - invalid data');
         showStatus('IMAGE CAPTURE FAILED - RETRY', 'error');
         return;
     }
     
+    // Validate image data format
+    if (!capturedImageData.startsWith('data:image/jpeg')) {
+        console.log('WARNING: Image data format may be incorrect');
+    }
+    
     // Stop camera
     if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
+        console.log('Stopping camera stream...');
+        videoStream.getTracks().forEach(track => {
+            console.log('Stopping track:', track.kind);
+            track.stop();
+        });
         videoStream = null;
         videoElement = null;
     }
@@ -227,6 +259,7 @@ function captureImageFromPTT() {
     // Show screen 2
     showScreen2();
     showStatus('IMAGE CAPTURED! GENERATE PALETTE', 'success');
+    console.log('=== CAPTURE IMAGE COMPLETED ===');
 }
 
 // Helper function to convert data URL to Blob
@@ -269,130 +302,228 @@ function colorDistance(rgb1, rgb2) {
 
 // Function to extract dominant colors from image data
 function extractColorsFromImage(imageData) {
-    return new Promise((resolve) => {
-        // Create image element from data URL
-        const img = new Image();
-        img.onload = function() {
-            // Create canvas to analyze image
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+    return new Promise((resolve, reject) => {
+        try {
+            console.log('=== STARTING COLOR EXTRACTION ===');
             
-            // Set canvas size to match image (but smaller for performance)
-            // Use larger canvas for better color accuracy
-            const maxWidth = 300;
-            const maxHeight = 300;
-            const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-            canvas.width = Math.max(100, img.width * ratio);
-            canvas.height = Math.max(100, img.height * ratio);
-            
-            // Draw image on canvas
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            // Get image data
-            const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageDataObj.data;
-            
-            // Collect all colors with better sampling
-            const colors = [];
-            // Sample more pixels but still maintain performance
-            const step = Math.max(1, Math.floor(canvas.width * canvas.height / 2500));
-            
-            for (let i = 0; i < data.length; i += step * 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                const a = data[i + 3];
-                
-                // Skip transparent pixels
-                if (a < 128) continue;
-                
-                // Skip very dark or very light pixels for better palette
-                const brightness = (r + g + b) / 3;
-                if (brightness < 15 || brightness > 240) continue;
-                
-                colors.push([r, g, b]);
+            // Validate input
+            if (!imageData) {
+                reject(new Error('No image data provided'));
+                return;
             }
             
-            // If we don't have enough colors, use all pixels
-            if (colors.length < 50) {
-                for (let i = 0; i < data.length; i += 20 * 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    const a = data[i + 3];
-                    
-                    // Skip transparent pixels
-                    if (a < 128) continue;
-                    
-                    colors.push([r, g, b]);
-                }
+            if (!imageData.startsWith('data:image/')) {
+                reject(new Error('Invalid image data format'));
+                return;
             }
             
-            // Simple clustering: group similar colors together
-            const clusters = [];
-            const threshold = 30; // Distance threshold for grouping colors
+            console.log('Image data validated successfully');
             
-            colors.forEach(color => {
-                let foundCluster = false;
-                
-                // Try to find an existing cluster for this color
-                for (let i = 0; i < clusters.length; i++) {
-                    const cluster = clusters[i];
-                    // Calculate average color of the cluster
-                    const avgR = cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length;
-                    const avgG = cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length;
-                    const avgB = cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length;
+            // Create image element from data URL
+            const img = new Image();
+            img.onload = function() {
+                try {
+                    console.log('Image loaded. Dimensions:', img.width, 'x', img.height);
                     
-                    // If color is close enough to cluster average, add it to the cluster
-                    if (colorDistance(color, [avgR, avgG, avgB]) < threshold) {
-                        cluster.push(color);
-                        foundCluster = true;
-                        break;
+                    // Validate image dimensions
+                    if (img.width === 0 || img.height === 0) {
+                        reject(new Error('Invalid image dimensions'));
+                        return;
                     }
-                }
-                
-                // If no cluster found, create a new one
-                if (!foundCluster) {
-                    clusters.push([color]);
-                }
-            });
-            
-            // Convert clusters to dominant colors
-            const dominantColors = clusters
-                .map(cluster => {
-                    // Calculate average color of the cluster
-                    const avgR = Math.round(cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length);
-                    const avgG = Math.round(cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length);
-                    const avgB = Math.round(cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length);
                     
-                    return {
-                        color: rgbToHex(avgR, avgG, avgB),
-                        count: cluster.length,
-                        rgb: [avgR, avgG, avgB]
-                    };
-                })
-                .sort((a, b) => b.count - a.count) // Sort by frequency
-                .slice(0, 5); // Get top 5 colors
-            
-            // Extract just the color values
-            const topColors = dominantColors.map(item => item.color);
-            
-            // Fill up to 5 colors if needed
-            while (topColors.length < 5) {
-                // Use a color from existing colors or fallback
-                if (dominantColors.length > 0) {
-                    topColors.push(dominantColors[topColors.length % dominantColors.length].color);
-                } else {
-                    // Fallback colors
-                    const fallbackColors = ["#FF5733", "#33FF57", "#3357FF", "#F3FF33", "#FF33F3"];
-                    topColors.push(fallbackColors[topColors.length]);
+                    // Create canvas to analyze image
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Check if canvas context is available
+                    if (!ctx) {
+                        reject(new Error('Unable to create canvas context'));
+                        return;
+                    }
+                    
+                    // Set canvas size to match image (but smaller for performance)
+                    const maxWidth = 300;
+                    const maxHeight = 300;
+                    const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                    canvas.width = Math.max(100, img.width * ratio);
+                    canvas.height = Math.max(100, img.height * ratio);
+                    
+                    console.log('Canvas size set to:', canvas.width, 'x', canvas.height);
+                    
+                    // Draw image on canvas
+                    try {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    } catch (drawError) {
+                        console.error('Error drawing image to canvas:', drawError);
+                        reject(new Error('Failed to draw image to canvas: ' + drawError.message));
+                        return;
+                    }
+                    
+                    // Get image data
+                    let imageDataObj;
+                    try {
+                        imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    } catch (getImageError) {
+                        console.error('Error getting image data from canvas:', getImageError);
+                        reject(new Error('Failed to get image data from canvas: ' + getImageError.message));
+                        return;
+                    }
+                    
+                    const data = imageDataObj.data;
+                    
+                    console.log('Raw image data length:', data.length);
+                    
+                    // Check if we have valid image data
+                    if (!data || data.length === 0) {
+                        reject(new Error('No image data found'));
+                        return;
+                    }
+                    
+                    // Collect all colors with better sampling
+                    const colors = [];
+                    // Sample more pixels but still maintain performance
+                    const step = Math.max(1, Math.floor(canvas.width * canvas.height / 2500));
+                    
+                    console.log('Sampling step:', step);
+                    
+                    for (let i = 0; i < data.length; i += step * 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const a = data[i + 3];
+                        
+                        // Skip transparent pixels
+                        if (a < 128) continue;
+                        
+                        // Skip very dark or very light pixels for better palette
+                        const brightness = (r + g + b) / 3;
+                        if (brightness < 15 || brightness > 240) continue;
+                        
+                        colors.push([r, g, b]);
+                    }
+                    
+                    console.log('Initial colors collected:', colors.length);
+                    
+                    // If we don't have enough colors, use all pixels
+                    if (colors.length < 50) {
+                        console.log('Not enough colors, collecting more...');
+                        colors.length = 0; // Clear array
+                        for (let i = 0; i < data.length; i += 20 * 4) {
+                            const r = data[i];
+                            const g = data[i + 1];
+                            const b = data[i + 2];
+                            const a = data[i + 3];
+                            
+                            // Skip transparent pixels
+                            if (a < 128) continue;
+                            
+                            colors.push([r, g, b]);
+                        }
+                    }
+                    
+                    console.log('Final colors count:', colors.length);
+                    
+                    // If we still don't have colors, reject
+                    if (colors.length === 0) {
+                        reject(new Error('No valid colors found in image'));
+                        return;
+                    }
+                    
+                    // Simple clustering: group similar colors together
+                    const clusters = [];
+                    const threshold = 30; // Distance threshold for grouping colors
+                    
+                    console.log('Starting color clustering...');
+                    colors.forEach((color, index) => {
+                        // Limit processing for performance
+                        if (index > 1000) return;
+                        
+                        let foundCluster = false;
+                        
+                        // Try to find an existing cluster for this color
+                        for (let i = 0; i < clusters.length; i++) {
+                            const cluster = clusters[i];
+                            // Calculate average color of the cluster
+                            const avgR = cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length;
+                            const avgG = cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length;
+                            const avgB = cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length;
+                            
+                            // If color is close enough to cluster average, add it to the cluster
+                            if (colorDistance(color, [avgR, avgG, avgB]) < threshold) {
+                                cluster.push(color);
+                                foundCluster = true;
+                                break;
+                            }
+                        }
+                        
+                        // If no cluster found, create a new one
+                        if (!foundCluster) {
+                            clusters.push([color]);
+                        }
+                    });
+                    
+                    console.log('Clusters found:', clusters.length);
+                    
+                    // If we don't have clusters, reject
+                    if (clusters.length === 0) {
+                        reject(new Error('No color clusters found'));
+                        return;
+                    }
+                    
+                    // Convert clusters to dominant colors
+                    const dominantColors = clusters
+                        .map(cluster => {
+                            // Calculate average color of the cluster
+                            const avgR = Math.round(cluster.reduce((sum, c) => sum + c[0], 0) / cluster.length);
+                            const avgG = Math.round(cluster.reduce((sum, c) => sum + c[1], 0) / cluster.length);
+                            const avgB = Math.round(cluster.reduce((sum, c) => sum + c[2], 0) / cluster.length);
+                            
+                            return {
+                                color: rgbToHex(avgR, avgG, avgB),
+                                count: cluster.length,
+                                rgb: [avgR, avgG, avgB]
+                            };
+                        })
+                        .sort((a, b) => b.count - a.count) // Sort by frequency
+                        .slice(0, 5); // Get top 5 colors
+                    
+                    console.log('Dominant colors:', dominantColors);
+                    
+                    // Extract just the color values
+                    const topColors = dominantColors.map(item => item.color);
+                    
+                    // Fill up to 5 colors if needed - ONLY use existing colors, no fallbacks
+                    while (topColors.length < 5) {
+                        // Use a color from existing colors
+                        if (dominantColors.length > 0) {
+                            topColors.push(dominantColors[topColors.length % dominantColors.length].color);
+                        } else {
+                            // This should never happen, but just in case
+                            topColors.push('#808080'); // Neutral gray
+                        }
+                    }
+                    
+                    console.log('Final palette:', topColors);
+                    console.log('=== COLOR EXTRACTION COMPLETED SUCCESSFULLY ===');
+                    resolve(topColors);
+                } catch (error) {
+                    console.error('Error in image processing:', error);
+                    reject(new Error('Image processing failed: ' + error.message));
                 }
-            }
+            };
             
-            resolve(topColors);
-        };
-        
-        img.src = imageData;
+            img.onerror = function(event) {
+                console.error('Failed to load image. Event:', event);
+                console.error('Image src:', imageData.substring(0, 100));
+                reject(new Error('Failed to load image - check image data format'));
+            };
+            
+            console.log('Setting image source...');
+            img.src = imageData;
+        } catch (error) {
+            console.error('Error in extractColorsFromImage:', error);
+            reject(new Error('Color extraction failed: ' + error.message));
+        }
     });
 }
 
@@ -405,8 +536,24 @@ function rgbToHex(r, g, b) {
 }
 
 function analyzeColorsFromImage() {
+    console.log('=== COLOR ANALYSIS STARTED ===');
+    
     if (!capturedImageData) {
+        console.log('ERROR: No captured image data!');
         showStatus('NO IMAGE CAPTURED', 'error');
+        return;
+    }
+    
+    console.log('Image data length:', capturedImageData.length);
+    console.log('Image data preview:', capturedImageData.substring(0, 100));
+    
+    // Validate image data format
+    if (!capturedImageData.startsWith('data:image/')) {
+        console.log('ERROR: Invalid image data format!');
+        showStatus('INVALID IMAGE FORMAT', 'error');
+        const errorColors = ['#FF0000', '#000000', '#000000', '#000000', '#000000'];
+        currentPalette = errorColors;
+        displayPalette(errorColors);
         return;
     }
     
@@ -415,104 +562,24 @@ function analyzeColorsFromImage() {
     
     // Extract colors from image on device side
     extractColorsFromImage(capturedImageData).then(colors => {
-        console.log('Extracted colors:', colors);
+        console.log('SUCCESS: Extracted colors:', colors);
         currentPalette = colors;
         displayPalette(colors);
-        
-        // Just show success status
         showStatus('PALETTE READY! EMAIL TO SEND', 'success');
     }).catch(error => {
-        console.error('Color extraction failed:', error);
-        showStatus('COLOR EXTRACTION FAILED', 'error');
+        console.log('=== COLOR EXTRACTION FAILED ===');
+        console.error('Error details:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
         
-        // Fallback to simulated colors based on actual color extraction principles
-        // This will at least provide colors that look like they could come from an image
-        const fallbackColors = extractColorsFromImageFallback();
-        currentPalette = fallbackColors;
-        displayPalette(fallbackColors);
+        showStatus('EXTRACTION FAILED: ' + error.message, 'error');
         
-        showStatus('PALETTE READY! EMAIL TO SEND', 'success');
+        // Show detailed error information
+        const errorColors = ['#FF0000', '#000000', '#000000', '#000000', '#000000'];
+        currentPalette = errorColors;
+        displayPalette(errorColors);
     });
-}
-
-// More realistic fallback that generates colors based on common image patterns
-function extractColorsFromImageFallback() {
-    // Generate a palette with colors that look like they could come from a real image
-    // Using a deterministic approach based on current time to avoid pure randomness
-    const seed = Date.now() % 100000;
-    
-    // Generate a base color with natural hues
-    const baseHue = (seed * 137.508) % 360; // Use golden ratio for better distribution
-    const baseSat = 50 + (seed % 50);  // 50-100% saturation
-    const baseLight = 35 + (seed % 50); // 35-85% lightness
-    
-    // Generate related colors by varying hue, saturation, and lightness
-    const colors = [];
-    
-    // First color is the base color
-    const baseRgb = hslToRgb(baseHue / 360, baseSat / 100, baseLight / 100);
-    colors.push(rgbToHex(baseRgb[0], baseRgb[1], baseRgb[2]));
-    
-    // Generate complementary and analogous colors
-    for (let i = 1; i < 5; i++) {
-        let hueVariation, satVariation, lightVariation;
-        
-        // Create different types of color relationships
-        switch(i) {
-            case 1: // Complementary color
-                hueVariation = (baseHue + 180) % 360;
-                satVariation = Math.max(40, Math.min(100, baseSat + (seed % 20) - 10));
-                lightVariation = Math.max(30, Math.min(90, baseLight + (seed % 30) - 15));
-                break;
-            case 2: // Analogous color 1
-                hueVariation = (baseHue + 30 + (seed % 30)) % 360;
-                satVariation = Math.max(45, Math.min(95, baseSat + (seed % 15) - 7));
-                lightVariation = Math.max(35, Math.min(85, baseLight + (seed % 25) - 12));
-                break;
-            case 3: // Analogous color 2
-                hueVariation = (baseHue - 30 - (seed % 30) + 360) % 360;
-                satVariation = Math.max(45, Math.min(95, baseSat + (seed % 15) - 7));
-                lightVariation = Math.max(35, Math.min(85, baseLight + (seed % 25) - 12));
-                break;
-            case 4: // Triadic color
-                hueVariation = (baseHue + 120 + (seed % 60)) % 360;
-                satVariation = Math.max(50, Math.min(100, baseSat + (seed % 10) - 5));
-                lightVariation = Math.max(40, Math.min(90, baseLight + (seed % 20) - 10));
-                break;
-        }
-        
-        // Convert HSL to RGB
-        const rgb = hslToRgb(hueVariation / 360, satVariation / 100, lightVariation / 100);
-        colors.push(rgbToHex(rgb[0], rgb[1], rgb[2]));
-    }
-    
-    return colors;
-}
-
-// Helper function to convert HSL to RGB
-function hslToRgb(h, s, l) {
-    let r, g, b;
-    
-    if (s === 0) {
-        r = g = b = l; // achromatic
-    } else {
-        const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        };
-        
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-    }
-    
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
 function generatePalette() {
@@ -521,6 +588,9 @@ function generatePalette() {
 }
 
 function displayPalette(colors) {
+    console.log('=== DISPLAYING PALETTE ===');
+    console.log('Colors to display:', colors);
+    
     const paletteDisplay = document.getElementById('paletteDisplay');
     paletteDisplay.innerHTML = '';
     
@@ -572,6 +642,8 @@ function displayPalette(colors) {
                 swatchContainer.appendChild(colorSwatch);
                 swatchContainer.appendChild(colorLabel);
                 paletteContainer.appendChild(swatchContainer);
+            } else {
+                console.log('Invalid color at index', index, ':', color);
             }
         });
         
@@ -582,10 +654,13 @@ function displayPalette(colors) {
         
         console.log('Palette displayed successfully');
     } else {
+        console.log('ERROR: No valid colors to display');
         paletteDisplay.innerHTML = '<div class="placeholder-text">NO VALID COLORS FOUND</div>';
         currentPalette = [];
         console.log('No valid colors to display');
     }
+    
+    console.log('=== PALETTE DISPLAY COMPLETED ===');
 }
 
 function emailPalette() {
@@ -839,4 +914,28 @@ function sendPaletteToEmail(emailAddress) {
         console.error('Error generating palette image:', error);
         showStatus('FAILED TO GENERATE PALETTE IMAGE', 'error');
     });
+}
+
+// Helper function to test color extraction with a sample image
+// This can be called from the console for debugging
+function testColorExtraction() {
+    console.log('=== TESTING COLOR EXTRACTION ===');
+    
+    // Check if we have captured image data
+    if (!capturedImageData) {
+        console.log('No captured image data available');
+        return;
+    }
+    
+    console.log('Testing with captured image data of length:', capturedImageData.length);
+    
+    // Try to extract colors
+    extractColorsFromImage(capturedImageData)
+        .then(colors => {
+            console.log('Test successful! Extracted colors:', colors);
+            displayPalette(colors);
+        })
+        .catch(error => {
+            console.log('Test failed! Error:', error);
+        });
 }
